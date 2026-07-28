@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品管理後台</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
+        nav { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #ddd; }
+        nav a { margin-right: 16px; text-decoration: none; color: #4285f4; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
+        th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        img { width: 50px; height: 50px; object-fit: contain; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">首頁</a>
+        <a href="search.html">搜尋</a>
+        <a href="admin.html">管理後台</a>
+    </nav>
+
+    <h1>商品管理後台</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>縮圖</th>
+                <th>商品 ID</th>
+                <th>商品名稱</th>
+                <th>起算價格</th>
+                <th>販售選項與價格</th>
+            </tr>
+        </thead>
+        <tbody id="adminTable"></tbody>
+    </table>
+
+    <script type="module">
+        import { productCatalog } from './products.js';
+
+        const tableBody = document.getElementById('adminTable');
+
+        productCatalog.forEach(cat => {
+            cat.items.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><img src="${item.image}"></td>
+                    <td><code>${item.id}</code></td>
+                    <td>${item.name}</td>
+                    <td>NT$ ${item.price}</td>
+                    <td>${item.options.join('<br>')}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        });
+    </script>
+</body>
+</html>

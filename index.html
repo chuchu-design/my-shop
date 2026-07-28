@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周邊選購 - 名偵探柯南 30 週年紀念展</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
+        nav { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #ddd; }
+        nav a { margin-right: 16px; text-decoration: none; color: #4285f4; font-weight: bold; }
+        .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+        .card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px; background: white; width: 260px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
+        .card img { width: 100%; height: 200px; object-fit: contain; border-radius: 8px; margin-bottom: 12px; }
+        .card h3 { margin: 8px 0; font-size: 18px; }
+        .price { color: #d9534f; font-weight: bold; font-size: 18px; margin-bottom: 12px; }
+        select { width: 100%; padding: 8px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        button { width: 100%; padding: 10px; background-color: #4285f4; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #3367d6; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">首頁</a>
+        <a href="search.html">搜尋</a>
+        <a href="admin.html">管理後台</a>
+    </nav>
+
+    <div id="catalog"></div>
+
+    <script type="module">
+        import { productCatalog } from './products.js';
+
+        const catalogContainer = document.getElementById('catalog');
+
+        productCatalog.forEach(category => {
+            const section = document.createElement('section');
+            section.innerHTML = `<h1>${category.categoryName}</h1>`;
+            
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+
+            category.items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                
+                const optionsHtml = item.options.map(opt => `<option>${opt}</option>`).join('');
+
+                card.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <h3>${item.name}</h3>
+                    <div class="price">NT$ ${item.price} 起</div>
+                    <select>${optionsHtml}</select>
+                    <button onclick="alert('已加入購物車！')">加入購物車</button>
+                `;
+                grid.appendChild(card);
+            });
+
+            section.appendChild(grid);
+            catalogContainer.appendChild(section);
+        });
+    </script>
+</body>
+</html>

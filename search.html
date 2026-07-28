@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品搜尋</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
+        nav { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #ddd; }
+        nav a { margin-right: 16px; text-decoration: none; color: #4285f4; font-weight: bold; }
+        input { padding: 10px; width: 300px; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; margin-bottom: 20px; }
+        .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+        .card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px; background: white; width: 220px; text-align: center; }
+        .card img { width: 100%; height: 160px; object-fit: contain; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">首頁</a>
+        <a href="search.html">搜尋</a>
+        <a href="admin.html">管理後台</a>
+    </nav>
+
+    <h1>搜尋商品</h1>
+    <input type="text" id="searchInput" placeholder="輸入商品關鍵字（如：光柵、立牌）...">
+
+    <div id="searchResults" class="grid"></div>
+
+    <script type="module">
+        import { productCatalog } from './products.js';
+
+        const allItems = [];
+        productCatalog.forEach(cat => {
+            cat.items.forEach(item => allItems.push(item));
+        });
+
+        const input = document.getElementById('searchInput');
+        const container = document.getElementById('searchResults');
+
+        function render(items) {
+            container.innerHTML = '';
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <img src="${item.image}" alt="${item.name}">
+                    <h3>${item.name}</h3>
+                    <p style="color: #d9534f; font-weight: bold;">NT$ ${item.price} 起</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        input.addEventListener('input', () => {
+            const query = input.value.toLowerCase();
+            const filtered = allItems.filter(item => item.name.toLowerCase().includes(query));
+            render(filtered);
+        });
+
+        render(allItems);
+    </script>
+</body>
+</html>
