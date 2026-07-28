@@ -1,63 +1,96 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>周邊選購 - 名偵探柯南 30 週年紀念展</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
-        nav { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #ddd; }
-        nav a { margin-right: 16px; text-decoration: none; color: #4285f4; font-weight: bold; }
-        .grid { display: flex; flex-wrap: wrap; gap: 20px; }
-        .card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px; background: white; width: 260px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
-        .card img { width: 100%; height: 200px; object-fit: contain; border-radius: 8px; margin-bottom: 12px; }
-        .card h3 { margin: 8px 0; font-size: 18px; }
-        .price { color: #d9534f; font-weight: bold; font-size: 18px; margin-bottom: 12px; }
-        select { width: 100%; padding: 8px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
-        button { width: 100%; padding: 10px; background-color: #4285f4; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; font-weight: bold; }
-        button:hover { background-color: #3367d6; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>團購賣場</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    nav { margin-bottom: 20px; background: #f0f0f0; padding: 10px; border-radius: 6px; }
+    nav a { margin-right: 15px; font-weight: bold; text-decoration: none; color: #0076ff; }
+    .product-card { border: 1px solid #ccc; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .cart-box { background: #fdf8f0; border: 2px dashed #ffa726; padding: 15px; border-radius: 8px; margin-top: 30px; }
+    button { background: #0076ff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+    input { padding: 8px; width: 80%; margin-bottom: 8px; }
+  </style>
 </head>
 <body>
-    <nav>
-        <a href="index.html">首頁</a>
-        <a href="search.html">搜尋</a>
-        <a href="admin.html">管理後台</a>
-    </nav>
 
-    <div id="catalog"></div>
+  <nav>
+    <a href="index.html">🛒 購物下單</a> | 
+    <a href="search.html">🔍 團員查單與轉單</a> | 
+    <a href="admin.html">⚙️ 賣家後台</a>
+  </nav>
 
-    <script type="module">
-        import { productCatalog } from './products.js';
+  <h1>🛒 團購商品列表</h1>
+  <div id="product-list"></div>
 
-        const catalogContainer = document.getElementById('catalog');
+  <div class="cart-box">
+    <h2>🛍️ 我的購物車</h2>
+    <div id="cart-items">無商品</div>
+    <p><strong>總金額：NT$ <span id="cart-total">0</span></strong></p>
 
-        productCatalog.forEach(category => {
-            const section = document.createElement('section');
-            section.innerHTML = `<h1>${category.categoryName}</h1>`;
-            
-            const grid = document.createElement('div');
-            grid.className = 'grid';
+    <hr>
+    <h3>下單資料</h3>
+    <p><input type="text" id="buyer-name" placeholder="請輸入姓名 / 暱稱"></p>
+    <p><input type="text" id="buyer-phone" placeholder="請輸入手機號碼"></p>
+    <button onclick="handleCheckout()">送出訂單</button>
+  </div>
 
-            category.items.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                
-                const optionsHtml = item.options.map(opt => `<option>${opt}</option>`).join('');
+  <script src="products.js"></script>
+  <script>
+    function renderProducts() {
+      const container = document.getElementById('product-list');
+      container.innerHTML = products.map(p => `
+        <div class="product-card">
+          <div>
+            <h3>${p.name}</h3>
+            <p>價格：NT$ ${p.price}</p>
+          </div>
+          <button onclick="addToCart(${p.id})">加入購物車</button>
+        </div>
+      `).join('');
+    }
 
-                card.innerHTML = `
-                    <img src="${item.image}" alt="${item.name}">
-                    <h3>${item.name}</h3>
-                    <div class="price">NT$ ${item.price} 起</div>
-                    <select>${optionsHtml}</select>
-                    <button onclick="alert('已加入購物車！')">加入購物車</button>
-                `;
-                grid.appendChild(card);
-            });
+    function renderCart() {
+      const cart = getCart();
+      const container = document.getElementById('cart-items');
+      const totalEl = document.getElementById('cart-total');
 
-            section.appendChild(grid);
-            catalogContainer.appendChild(section);
-        });
-    </script>
+      if (cart.length === 0) {
+        container.innerHTML = "<p>購物車目前是空的</p>";
+        totalEl.innerText = "0";
+        return;
+      }
+
+      container.innerHTML = cart.map(item => `
+        <p>${item.name} x ${item.qty} = NT$ ${item.price * item.qty}</p>
+      `).join('');
+
+      const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+      totalEl.innerText = total;
+    }
+
+    function handleCheckout() {
+      const name = document.getElementById('buyer-name').value.trim();
+      const phone = document.getElementById('buyer-phone').value.trim();
+
+      if (!name || !phone) {
+        alert("請完整填寫姓名與手機號碼！");
+        return;
+      }
+
+      const order = submitOrder(name, phone);
+      if (order) {
+        alert(`🎉 下單成功！\n訂單編號：${order.id}\n轉單驗證碼：${order.verifyCode}\n（若日後要轉單給別人，請給他此驗證碼）`);
+        document.getElementById('buyer-name').value = '';
+        document.getElementById('buyer-phone').value = '';
+        renderCart();
+      }
+    }
+
+    renderProducts();
+    renderCart();
+  </script>
 </body>
 </html>

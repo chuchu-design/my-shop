@@ -1,63 +1,107 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>商品搜尋</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
-        nav { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #ddd; }
-        nav a { margin-right: 16px; text-decoration: none; color: #4285f4; font-weight: bold; }
-        input { padding: 10px; width: 300px; border-radius: 6px; border: 1px solid #ccc; font-size: 15px; margin-bottom: 20px; }
-        .grid { display: flex; flex-wrap: wrap; gap: 20px; }
-        .card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px; background: white; width: 220px; text-align: center; }
-        .card img { width: 100%; height: 160px; object-fit: contain; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>團員查單與轉單</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
+    nav { margin-bottom: 20px; background: #f0f0f0; padding: 10px; border-radius: 6px; }
+    nav a { margin-right: 15px; font-weight: bold; text-decoration: none; color: #0076ff; }
+    .card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; background: #fff; }
+    .transfer-box { background: #eef7ff; border: 1px solid #90caf9; padding: 15px; border-radius: 8px; margin-top: 30px; }
+    input { padding: 8px; margin-right: 5px; margin-bottom: 8px; width: 220px; }
+    button { background: #0076ff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+  </style>
 </head>
 <body>
-    <nav>
-        <a href="index.html">首頁</a>
-        <a href="search.html">搜尋</a>
-        <a href="admin.html">管理後台</a>
-    </nav>
 
-    <h1>搜尋商品</h1>
-    <input type="text" id="searchInput" placeholder="輸入商品關鍵字（如：光柵、立牌）...">
+  <nav>
+    <a href="index.html">🛒 購物下單</a> | 
+    <a href="search.html">🔍 團員查單與轉單</a> | 
+    <a href="admin.html">⚙️ 賣家後台</a>
+  </nav>
 
-    <div id="searchResults" class="grid"></div>
+  <h1>🔍 團員查詢訂單</h1>
+  <p>
+    <input type="text" id="search-phone" placeholder="請輸入您的手機號碼">
+    <button onclick="searchMyOrders()">查詢訂單與總額</button>
+  </p>
 
-    <script type="module">
-        import { productCatalog } from './products.js';
+  <div id="my-orders-result"></div>
 
-        const allItems = [];
-        productCatalog.forEach(cat => {
-            cat.items.forEach(item => allItems.push(item));
-        });
+  <div class="transfer-box">
+    <h2>🔄 接收轉單專區（接收者填寫）</h2>
+    <p>如果您要接收別人的訂單，請向原團員索取「訂單編號」與「驗證碼」：</p>
+    <p><input type="text" id="tf-order-id" placeholder="訂單編號 (例如 ORD...)"></p>
+    <p><input type="text" id="tf-code" placeholder="原團員提供的 6 位驗證碼"></p>
+    <p><input type="text" id="tf-new-name" placeholder="您的姓名 / 暱稱"></p>
+    <p><input type="text" id="tf-new-phone" placeholder="您的手機號碼"></p>
+    <button onclick="handleTransfer()">確認承接轉單</button>
+  </div>
 
-        const input = document.getElementById('searchInput');
-        const container = document.getElementById('searchResults');
+  <script src="products.js"></script>
+  <script>
+    function searchMyOrders() {
+      const phone = document.getElementById('search-phone').value.trim();
+      const container = document.getElementById('my-orders-result');
 
-        function render(items) {
-            container.innerHTML = '';
-            items.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.innerHTML = `
-                    <img src="${item.image}" alt="${item.name}">
-                    <h3>${item.name}</h3>
-                    <p style="color: #d9534f; font-weight: bold;">NT$ ${item.price} 起</p>
-                `;
-                container.appendChild(card);
-            });
-        }
+      if (!phone) {
+        alert("請輸入手機號碼！");
+        return;
+      }
 
-        input.addEventListener('input', () => {
-            const query = input.value.toLowerCase();
-            const filtered = allItems.filter(item => item.name.toLowerCase().includes(query));
-            render(filtered);
-        });
+      const orders = getOrders().filter(o => o.memberPhone === phone);
 
-        render(allItems);
-    </script>
+      if (orders.length === 0) {
+        container.innerHTML = "<p>查無此手機號碼的訂單紀錄。</p>";
+        return;
+      }
+
+      let grandTotal = 0;
+      let html = "<h3>您的訂單列表：</h3>";
+
+      orders.forEach(o => {
+        grandTotal += o.total;
+        html += `
+          <div class="card">
+            <h4>訂單編號：${o.id}</h4>
+            <p>訂購人：${o.memberName} (${o.memberPhone})</p>
+            <p>下單時間：${o.createdAt}</p>
+            <p>商品明細：${o.items.map(i => `${i.name} x${i.qty}`).join(', ')}</p>
+            <p><strong>單筆金額：NT$ ${o.total}</strong></p>
+            <p style="color: #d9534f;"><strong>🔑 轉單驗證碼：${o.verifyCode}</strong> (把編號與此碼給對方即可轉單)</p>
+          </div>
+        `;
+      });
+
+      html += `<h3 style="color: #2e7d32; background: #e8f5e9; padding: 10px; border-radius: 6px;">所有訂單累計總金額：NT$ ${grandTotal}</h3>`;
+      container.innerHTML = html;
+    }
+
+    function handleTransfer() {
+      const orderId = document.getElementById('tf-order-id').value.trim();
+      const code = document.getElementById('tf-code').value.trim();
+      const newName = document.getElementById('tf-new-name').value.trim();
+      const newPhone = document.getElementById('tf-new-phone').value.trim();
+
+      if (!orderId || !code || !newName || !newPhone) {
+        alert("請完整填寫轉單資料！");
+        return;
+      }
+
+      const res = transferOrder(orderId, code, newName, newPhone);
+      alert(res.msg);
+
+      if (res.success) {
+        document.getElementById('tf-order-id').value = '';
+        document.getElementById('tf-code').value = '';
+        document.getElementById('tf-new-name').value = '';
+        document.getElementById('tf-new-phone').value = '';
+        document.getElementById('search-phone').value = newPhone;
+        searchMyOrders();
+      }
+    }
+  </script>
 </body>
 </html>

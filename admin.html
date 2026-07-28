@@ -1,59 +1,92 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>商品管理後台</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f9f9f9; color: #333; }
-        nav { margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid #ddd; }
-        nav a { margin-right: 16px; text-decoration: none; color: #4285f4; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
-        th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        img { width: 50px; height: 50px; object-fit: contain; border-radius: 4px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>賣家後台</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: auto; }
+    nav { margin-bottom: 20px; background: #f0f0f0; padding: 10px; border-radius: 6px; }
+    nav a { margin-right: 15px; font-weight: bold; text-decoration: none; color: #0076ff; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .clear-btn { background: #d9534f; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; float: right; }
+  </style>
 </head>
 <body>
-    <nav>
-        <a href="index.html">首頁</a>
-        <a href="search.html">搜尋</a>
-        <a href="admin.html">管理後台</a>
-    </nav>
 
-    <h1>商品管理後台</h1>
+  <nav>
+    <a href="index.html">🛒 購物下單</a> | 
+    <a href="search.html">🔍 團員查單與轉單</a> | 
+    <a href="admin.html">⚙️ 賣家後台</a>
+  </nav>
 
-    <table>
-        <thead>
+  <h1>⚙️ 賣家後台 - 所有訂單總覽</h1>
+  <button class="clear-btn" onclick="clearAllOrders()">清空所有測試訂單</button>
+
+  <div id="admin-orders-table"></div>
+
+  <script src="products.js"></script>
+  <script>
+    function renderAdminOrders() {
+      const orders = getOrders();
+      const container = document.getElementById('admin-orders-table');
+
+      if (orders.length === 0) {
+        container.innerHTML = "<p>目前沒有任何訂單紀錄。</p>";
+        return;
+      }
+
+      let totalSales = 0;
+      let html = `
+        <table>
+          <thead>
             <tr>
-                <th>縮圖</th>
-                <th>商品 ID</th>
-                <th>商品名稱</th>
-                <th>起算價格</th>
-                <th>販售選項與價格</th>
+              <th>訂單編號</th>
+              <th>團員姓名</th>
+              <th>手機號碼</th>
+              <th>訂購內容</th>
+              <th>金額</th>
+              <th>目前驗證碼</th>
+              <th>下單時間</th>
             </tr>
-        </thead>
-        <tbody id="adminTable"></tbody>
-    </table>
+          </thead>
+          <tbody>
+      `;
 
-    <script type="module">
-        import { productCatalog } from './products.js';
+      orders.forEach(o => {
+        totalSales += o.total;
+        html += `
+          <tr>
+            <td><strong>${o.id}</strong></td>
+            <td>${o.memberName}</td>
+            <td>${o.memberPhone}</td>
+            <td>${o.items.map(i => `${i.name} x${i.qty}`).join('<br>')}</td>
+            <td>NT$ ${o.total}</td>
+            <td><code>${o.verifyCode}</code></td>
+            <td>${o.createdAt}</td>
+          </tr>
+        `;
+      });
 
-        const tableBody = document.getElementById('adminTable');
+      html += `
+          </tbody>
+        </table>
+        <h3>賣場總銷售額：NT$ ${totalSales}</h3>
+      `;
 
-        productCatalog.forEach(cat => {
-            cat.items.forEach(item => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><img src="${item.image}"></td>
-                    <td><code>${item.id}</code></td>
-                    <td>${item.name}</td>
-                    <td>NT$ ${item.price}</td>
-                    <td>${item.options.join('<br>')}</td>
-                `;
-                tableBody.appendChild(row);
-            });
-        });
-    </script>
+      container.innerHTML = html;
+    }
+
+    function clearAllOrders() {
+      if (confirm("確定要清空所有訂單嗎？")) {
+        localStorage.removeItem('orders');
+        renderAdminOrders();
+      }
+    }
+
+    renderAdminOrders();
+  </script>
 </body>
 </html>
