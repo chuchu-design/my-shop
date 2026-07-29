@@ -1,8 +1,9 @@
-// 1. 載入 Firebase 核心與 Auth 模組
+// 1. 載入 Firebase 核心、Auth 與 Firestore 模組
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 2. 你的真實 Firebase 金鑰設定
+// 2. Firebase 設定
 const firebaseConfig = {
   apiKey: "AIzaSyCzTKsFrttWiWECWsHRvDTJ9N_XPH0bWEM",
   authDomain: "my-shop-new-efdb0.firebaseapp.com",
@@ -13,20 +14,48 @@ const firebaseConfig = {
   measurementId: "G-0DYCN7TFL9"
 };
 
-// 3. 初始化 Firebase 與 Google 登入服務
+// 3. 初始化服務
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-// 全域當前使用者變數
 window.currentUser = null;
+window.userProfile = null;
 
-// Google 登入功能
+// Google 登入邏輯 (含首次暱稱設定)
 window.handleGoogleLogin = async function() {
   try {
     const result = await signInWithPopup(auth, provider);
-    window.currentUser = result.user;
-    alert(`歡迎登入，${result.user.displayName}！`);
+    const user = result.user;
+    
+    // 檢查資料庫是否有此團員資料
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+
+    let nickname = "";
+
+    if (!userSnap.exists()) {
+      // 首次登入：要求輸入暱稱（強制不能留空）
+      while (!nickname || nickname.trim() === "") {
+        nickname = prompt("歡迎第一次使用！請輸入您的專屬暱稱（設定後無法自行修改）：");
+      }
+      nickname = nickname.trim();
+
+      // 儲存至資料庫
+      await setDoc(userRef, {
+        uid: user.uid,
+        email: user.email,
+        nickname: nickname,
+        createdAt: new Date().toISOString()
+      });
+      alert(`暱稱設定完成！歡迎加入，${nickname}！`);
+    } else {
+      nickname = userSnap.data().nickname;
+      alert(`歡迎回來，${nickname}！`);
+    }
+
+    window.userProfile = { uid: user.uid, email: user.email, nickname: nickname };
   } catch (error) {
     console.error("登入失敗:", error);
     alert("登入失敗，請稍後再試！");
@@ -37,11 +66,13 @@ window.handleGoogleLogin = async function() {
 window.handleLogout = async function() {
   await signOut(auth);
   window.currentUser = null;
+  window.userProfile = null;
   alert("已成功登出");
+  window.location.reload();
 };
 
-// 4. 自動監聽登入狀態（更新畫面的登入/登出按鈕與顯示姓名）
-onAuthStateChanged(auth, (user) => {
+// 自動監聽登入狀態與載入暱稱
+onAuthStateChanged(auth, async (user) => {
   window.currentUser = user;
   const desktopInfo = document.getElementById('user-info-desktop');
   const loginBtnDesktop = document.getElementById('login-btn-desktop');
@@ -49,8 +80,17 @@ onAuthStateChanged(auth, (user) => {
   const orderNotice = document.getElementById('order-login-notice');
 
   if (user) {
-    // 已登入狀態
-    if (desktopInfo) desktopInfo.innerHTML = `👤 ${user.displayName}`;
+    // 取得資料庫暱稱
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    let displayName = user.displayName;
+
+    if (userSnap.exists()) {
+      window.userProfile = userSnap.data();
+      displayName = window.userProfile.nickname;
+    }
+
+    if (desktopInfo) desktopInfo.innerHTML = `👤 團員：${displayName}`;
     if (loginBtnDesktop) {
       loginBtnDesktop.innerText = "登出";
       loginBtnDesktop.onclick = window.handleLogout;
@@ -60,11 +100,9 @@ onAuthStateChanged(auth, (user) => {
       loginBtnMobile.innerText = "登出";
       loginBtnMobile.onclick = window.handleLogout;
     }
-    if (orderNotice) {
-      orderNotice.classList.add('hidden'); // 隱藏未登入提示
-    }
+    if (orderNotice) orderNotice.classList.add('hidden');
   } else {
-    // 未登入狀態
+    window.userProfile = null;
     if (desktopInfo) desktopInfo.innerHTML = "未登入";
     if (loginBtnDesktop) {
       loginBtnDesktop.innerText = "Google 登入";
@@ -75,8 +113,6 @@ onAuthStateChanged(auth, (user) => {
       loginBtnMobile.innerText = "登入";
       loginBtnMobile.onclick = window.handleGoogleLogin;
     }
-    if (orderNotice) {
-      orderNotice.classList.remove('hidden');
-    }
+    if (orderNotice) orderNotice.classList.remove('hidden');
   }
 });

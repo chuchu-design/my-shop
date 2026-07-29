@@ -8,7 +8,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 1. 未驗證 / 未登入時顯示的阻擋畫面 -->
+  <!-- 未驗證遮罩 -->
   <div id="admin-auth-modal" class="fixed inset-0 bg-slate-900 bg-opacity-95 flex items-center justify-center z-50 p-4">
     <div class="bg-white p-6 rounded-xl max-w-sm w-full text-center shadow-2xl">
       <h2 class="text-xl font-bold text-gray-800 mb-2">🔒 團主專屬後台</h2>
@@ -24,13 +24,13 @@
     </div>
   </div>
 
-  <!-- 2. 團主後台主要畫面 (驗證通過後自動解鎖顯示) -->
+  <!-- 團主後台內容 -->
   <div id="admin-content" class="hidden flex flex-col md:flex-row min-h-screen">
-    <!-- 電腦端側邊欄 -->
+    <!-- 電腦側邊欄 -->
     <aside class="hidden md:flex flex-col w-64 bg-slate-800 text-white min-h-screen p-4">
       <h1 class="text-xl font-bold mb-6 text-amber-400">👑 團主後台</h1>
       <nav class="flex flex-col space-y-2">
-        <a href="admin.html" class="p-3 rounded-lg bg-slate-700 text-amber-400 font-bold">📊 統計總覽</a>
+        <a href="admin.html" class="p-3 rounded-lg bg-slate-700 text-amber-400 font-bold">📊 統計總覽與名冊</a>
         <a href="index.html" class="p-3 rounded-lg hover:bg-slate-700 text-gray-300">🛒 返回賣場</a>
       </nav>
       <div class="mt-auto pt-4 border-t border-slate-700 text-xs text-slate-400" id="admin-user-display">
@@ -39,39 +39,54 @@
     </aside>
 
     <!-- 主要內容區 -->
-    <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0">
-      <div class="flex justify-between items-center mb-6">
+    <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0 space-y-8">
+      <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold text-gray-800">團主數據中心</h2>
         <button onclick="handleLogout()" class="text-sm bg-slate-200 hover:bg-slate-300 text-gray-700 px-3 py-1.5 rounded-lg">登出帳號</button>
       </div>
 
-      <!-- 數據卡片區 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-xl shadow-sm border">
-          <h3 class="text-gray-500 font-medium mb-2">📦 開團商品總下單數</h3>
-          <p class="text-3xl font-bold text-indigo-600" id="total-products-count">0 件</p>
+      <!-- 1. 團員總名冊表 (團主獨有修改暱稱功能) -->
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold text-gray-800">👥 團員總名冊</h3>
+          <span class="text-xs text-gray-500">團員無法自行修改暱稱，僅團主可在此修改</span>
         </div>
-        <div class="bg-white p-6 rounded-xl shadow-sm border">
-          <h3 class="text-gray-500 font-medium mb-2">👥 總跟團人數</h3>
-          <p class="text-3xl font-bold text-emerald-600" id="total-members-count">0 人</p>
-        </div>
-      </div>
-
-      <!-- 團員訂單明細表 -->
-      <div class="bg-white rounded-xl shadow-sm border p-4">
-        <h3 class="text-lg font-bold mb-4 text-gray-800">團員訂單總量</h3>
         <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse">
             <thead>
-              <tr class="border-b text-gray-500 text-sm">
-                <th class="p-2">團員姓名</th>
-                <th class="p-2">訂單總數</th>
-                <th class="p-2">下單總金額</th>
+              <tr class="border-b text-gray-500 text-sm bg-gray-50">
+                <th class="p-3">團員暱稱</th>
+                <th class="p-3">Google Email</th>
+                <th class="p-3">加入時間</th>
+                <th class="p-3 text-center">操作</th>
               </tr>
             </thead>
-            <tbody id="admin-member-list">
+            <tbody id="admin-members-table">
               <tr>
-                <td colspan="3" class="p-4 text-center text-gray-400">尚無資料</td>
+                <td colspan="4" class="p-4 text-center text-gray-400">團員資料載入中...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. 下單總量統計表 -->
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">📦 團員訂單明細紀錄</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b text-gray-500 text-sm bg-gray-50">
+                <th class="p-3">下單團員</th>
+                <th class="p-3">商品名稱</th>
+                <th class="p-3">數量</th>
+                <th class="p-3">總金額</th>
+                <th class="p-3">下單時間</th>
+              </tr>
+            </thead>
+            <tbody id="admin-orders-table">
+              <tr>
+                <td colspan="5" class="p-4 text-center text-gray-400">尚無下單資料</td>
               </tr>
             </tbody>
           </table>
@@ -79,38 +94,91 @@
       </div>
     </main>
 
-    <!-- 手機端底部捷徑 -->
+    <!-- 手機底部捷徑 -->
     <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-800 text-white flex justify-around p-2 text-xs text-center z-10">
       <a href="index.html" class="flex-1 py-1">🛒<br>賣場</a>
       <a href="admin.html" class="flex-1 py-1 text-amber-400 font-bold">👑<br>後台</a>
     </nav>
   </div>
 
-  <!-- 引入 Google 登入邏輯 -->
+  <!-- 邏輯腳本 -->
   <script type="module">
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import "./auth.js";
 
-    // 監聽登入狀態：只要登入者是任何已驗證使用者就放行（或可綁定你的特定 Email）
     const auth = getAuth();
-    onAuthStateChanged(auth, (user) => {
+    const db = getFirestore();
+
+    // 監聽登入狀態
+    onAuthStateChanged(auth, async (user) => {
       const modal = document.getElementById('admin-auth-modal');
       const content = document.getElementById('admin-content');
-      const statusText = document.getElementById('auth-status-text');
       const userDisplay = document.getElementById('admin-user-display');
 
       if (user) {
-        // 已登入：隱藏遮罩，顯示後台內容
         modal.classList.add('hidden');
         content.classList.remove('hidden');
         if (userDisplay) userDisplay.innerText = `👑 團主：${user.displayName || user.email}`;
+        
+        // 載入團員名冊
+        loadMembersList();
       } else {
-        // 未登入：跳出 Google 登入要求
         modal.classList.remove('hidden');
         content.classList.add('hidden');
-        statusText.innerText = "請點擊下方按鈕以 Google 帳號驗證團主身份";
       }
     });
+
+    // 載入所有團員資料
+    async function loadMembersList() {
+      const tableBody = document.getElementById('admin-members-table');
+      try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        if (querySnapshot.empty) {
+          tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400">目前尚無註冊團員</td></tr>`;
+          return;
+        }
+
+        let html = '';
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const createdDate = data.createdAt ? new Date(data.createdAt).toLocaleDateString() : '未知';
+          
+          html += `
+            <tr class="border-b text-sm hover:bg-gray-50">
+              <td class="p-3 font-bold text-indigo-600">${data.nickname || '未設定'}</td>
+              <td class="p-3 text-gray-600">${data.email || '無'}</td>
+              <td class="p-3 text-gray-400">${createdDate}</td>
+              <td class="p-3 text-center">
+                <button onclick="editNickname('${data.uid}', '${data.nickname}')" class="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded text-xs font-medium">
+                  ✏️ 修改暱稱
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+        tableBody.innerHTML = html;
+      } catch (error) {
+        console.error("載入名冊失敗:", error);
+        tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">載入失敗，請稍後重試</td></tr>`;
+      }
+    }
+
+    // 團主修改團員暱稱功能
+    window.editNickname = async function(uid, oldNickname) {
+      const newNickname = prompt(`修改團員舊暱稱【${oldNickname}】為：`, oldNickname);
+      if (newNickname && newNickname.trim() !== "" && newNickname !== oldNickname) {
+        try {
+          const userRef = doc(db, "users", uid);
+          await updateDoc(userRef, { nickname: newNickname.trim() });
+          alert("暱稱修改成功！");
+          loadMembersList(); // 重新整理列表
+        } catch (error) {
+          console.error("修改暱稱失敗:", error);
+          alert("修改失敗，請稍後重試！");
+        }
+      }
+    };
   </script>
 </body>
 </html>
