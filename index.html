@@ -8,38 +8,47 @@
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800">
 
-  <!-- 頂部欄 -->
+  <!-- 頂部導覽列 -->
   <nav class="bg-white border-b shadow-sm p-4 sticky top-0 z-10">
     <div class="max-w-4xl mx-auto flex justify-between items-center">
       <h1 class="text-xl font-bold text-blue-600">🛒 團購賣場</h1>
-      <a href="admin.html" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded">團主後台</a>
+      <div id="user-info" class="flex items-center gap-3">
+        <!-- 由 auth.js 動態渲染登入狀態 / 暱稱 -->
+        <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-1.5 rounded-lg font-medium">
+          Google 登入
+        </button>
+      </div>
     </div>
   </nav>
 
-  <!-- 賣場列表 -->
+  <!-- 主要內容區 -->
   <main class="max-w-4xl mx-auto p-4 sm:p-6">
-    <h2 class="text-2xl font-bold mb-6 text-gray-800">最新開團商品</h2>
-    
-    <!-- 商品載入區域 -->
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">進行中的團購商品</h2>
+      <a href="admin.html" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded">團主後台</a>
+    </div>
+
+    <!-- 商品列表容器 -->
     <div id="products-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <p class="text-gray-500">商品載入中...</p>
     </div>
   </main>
 
+  <!-- 引入身份驗證 -->
+  <script type="module" src="auth.js"></script>
+
+  <!-- 讀取商品邏輯 -->
   <script type="module">
     import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 
-    // 這裡會由 Firebase 初始化（若有獨立 auth.js 會自動連結，亦可共用 db）
     const db = getFirestore();
     const container = document.getElementById('products-container');
 
-    // 即時監聽後台商品庫 (Realtime Sync)
     const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
     onSnapshot(q, (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
-        container.innerHTML = "<p class='text-gray-500'>目前沒有進行中的團購。</p>";
+        container.innerHTML = "<p class='text-gray-500'>目前沒有進行中的團購商品。</p>";
         return;
       }
 
@@ -48,10 +57,13 @@
         const card = document.createElement('div');
         card.className = "bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 flex flex-col";
         
-        const optionsHtml = item.options.map(opt => `
+        const optionsHtml = (item.options || []).map(opt => `
           <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-sm">
             <span class="font-medium text-gray-700">${opt.name}</span>
-            <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
+              <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded">下單</button>
+            </div>
           </div>
         `).join('');
 
@@ -59,21 +71,20 @@
           <img src="${item.imageUrl}" class="w-full h-48 object-cover bg-gray-100" alt="${item.productName}">
           <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
             <div>
-              <span class="text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">${item.storeTitle}</span>
+              <span class="text-xs font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full">${item.storeTitle}</span>
               <h3 class="text-lg font-bold text-gray-900 mt-2">${item.productName}</h3>
             </div>
             
             <div class="space-y-2">
               ${optionsHtml}
             </div>
-
-            <button class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 rounded-lg transition text-sm">
-              選擇規格下單
-            </button>
           </div>
         `;
         container.appendChild(card);
       });
+    }, (err) => {
+      console.error("讀取失敗：", err);
+      container.innerHTML = "<p class='text-red-500'>無法載入商品，請確認登入狀態與 Firebase 權限。</p>";
     });
   </script>
 </body>
