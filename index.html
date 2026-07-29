@@ -36,7 +36,7 @@
       <p class="text-gray-500">商品載入中...</p>
     </div>
 
-    <!-- 個人歷史訂單區 & 轉單專區 (需求 2) -->
+    <!-- 個人歷史訂單區 & 轉單專區 -->
     <div class="mt-12 pt-8 border-t border-gray-200">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -174,21 +174,13 @@
     // 購物車結帳
     window.checkoutCart = async () => {
       const user = auth.currentUser;
-      if (!user) {
-        alert("請先完成 Google 登入才能送出購物車！");
-        return;
-      }
-      if (cart.length === 0) {
-        alert("購物車是空的！");
-        return;
-      }
+      if (!user) return alert("請先完成 Google 登入才能送出購物車！");
+      if (cart.length === 0) return alert("購物車是空的！");
 
       let currentNickname = user.displayName || "團員";
       try {
         const uSnap = await getDoc(doc(db, "users", user.uid));
-        if (uSnap.exists() && uSnap.data()?.nickname) {
-          currentNickname = uSnap.data().nickname;
-        }
+        if (uSnap.exists() && uSnap.data()?.nickname) currentNickname = uSnap.data().nickname;
       } catch(e) {}
 
       if (confirm(`確定要送出購物車內的 ${cart.length} 項商品嗎？`)) {
@@ -215,19 +207,18 @@
           cart = [];
           saveCart();
           closeCartModal();
-          alert("🎉 訂單已成功送出！可在下方「我的下單紀錄」查看。");
+          alert("🎉 訂單已成功送出！可以在下方「我的下單紀錄」查看。");
         } catch (e) {
           alert("結帳失敗：" + e.message);
         }
       }
     };
 
-    // 2. 轉單發起功能 (產生 6 位數驗證碼) (需求 2)
+    // 轉單發起
     window.startOrderTransfer = async (orderId, productName, optionName) => {
       const user = auth.currentUser;
       if (!user) return alert("請先登入！");
-
-      if (!confirm(`確定要將【${productName} - ${optionName}】轉單出去嗎？\n系統將會產生一組 6 位數驗證碼給您。`)) return;
+      if (!confirm(`確定要將【${productName} - ${optionName}】轉單出去嗎？`)) return;
 
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
@@ -248,13 +239,13 @@
           })
         });
 
-        alert(`🔑 轉單驗證碼已生成：【 ${code} 】\n\n請將此 6 位數驗證碼提供給接收對象，對方輸入驗證碼後即可接管該訂單！`);
+        alert(`🔑 轉單驗證碼已生成：【 ${code} 】\n請將驗證碼提供給接收對象。`);
       } catch (e) {
         alert("發起轉單失敗：" + e.message);
       }
     };
 
-    // 3. 接收轉單功能 (驗證碼校對) (需求 2)
+    // 接收轉單
     window.receiveTransferPrompt = async () => {
       const user = auth.currentUser;
       if (!user) return alert("請先登入後再接收轉單！");
@@ -268,10 +259,7 @@
         const q = query(collection(db, "orders"), where("transferCode", "==", code), where("status", "==", "轉單中"));
         const snapshot = await getDocs(q);
 
-        if (snapshot.empty) {
-          alert("❌ 找不到對應的轉單驗證碼，或該訂單已被接收/取消！");
-          return;
-        }
+        if (snapshot.empty) return alert("❌ 找不到對應的轉單驗證碼，或該訂單已被接收/取消！");
 
         let currentNickname = user.displayName || "團員";
         try {
@@ -287,7 +275,7 @@
           userName: currentNickname,
           userEmail: user.email,
           status: "已下單",
-          transferCode: null, // 清除驗證碼
+          transferCode: null,
           historyLogs: arrayUnion({
             action: `轉單接收成功：由 [${oldOrder.userName || '原買家'}] 轉交給 [${currentNickname}]`,
             operator: `${currentNickname} (${user.email})`,
@@ -295,7 +283,7 @@
           })
         });
 
-        alert(`🎉 轉單成功！【${oldOrder.productName} - ${oldOrder.optionName}】已順利移交至您的帳戶！`);
+        alert(`🎉 轉單成功！【${oldOrder.productName} - ${oldOrder.optionName}】已移交至您的帳戶！`);
       } catch (e) {
         alert("接收轉單失敗：" + e.message);
       }
@@ -307,7 +295,7 @@
       modal.classList.remove('hidden');
     };
 
-    // 商品列表渲染
+    // 商品列表渲染（自動排除「已下架」商品，若為「缺貨」則按鈕改為停用）
     onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
@@ -318,10 +306,18 @@
       const groups = {};
       snapshot.forEach((doc) => {
         const item = { id: doc.id, ...doc.data() };
+        // 若商品設定為已下架，前台直接不呈現
+        if (item.status === "archived") return;
+
         const title = item.storeTitle || "未分類團購";
         if (!groups[title]) groups[title] = [];
         groups[title].push(item);
       });
+
+      if (Object.keys(groups).length === 0) {
+        container.innerHTML = "<p class='text-gray-500'>目前沒有進行中的團購商品。</p>";
+        return;
+      }
 
       Object.keys(groups).forEach(storeTitle => {
         const groupSection = document.createElement('div');
@@ -330,24 +326,43 @@
         let productsHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
         groups[storeTitle].forEach(item => {
-          const optionsHtml = (item.options || []).map(opt => `
-            <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-sm">
-              <span class="font-medium text-gray-700">${opt.name}</span>
-              <div class="flex items-center gap-2">
-                <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
-                <button onclick="addToCart('${storeTitle}', '${item.productName}', '${opt.name}', ${opt.price})" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-bold">
-                  + 購物車
-                </button>
-              </div>
-            </div>
-          `).join('');
+          const isOutOfStock = item.status === "out_of_stock";
+
+          const optionsHtml = (item.options || []).map(opt => {
+            if (isOutOfStock) {
+              return `
+                <div class="flex justify-between items-center bg-gray-100 p-2.5 rounded-lg border text-sm opacity-60">
+                  <span class="font-medium text-gray-500 line-through">${opt.name}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-400">NT$ ${opt.price}</span>
+                    <button disabled class="bg-gray-400 text-white text-xs px-3 py-1.5 rounded-lg font-bold cursor-not-allowed">
+                      🚫 缺貨中
+                    </button>
+                  </div>
+                </div>
+              `;
+            } else {
+              return `
+                <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-sm">
+                  <span class="font-medium text-gray-700">${opt.name}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
+                    <button onclick="addToCart('${storeTitle}', '${item.productName}', '${opt.name}', ${opt.price})" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-bold">
+                      + 購物車
+                    </button>
+                  </div>
+                </div>
+              `;
+            }
+          }).join('');
 
           productsHtml += `
-            <div class="border rounded-xl p-4 flex flex-col justify-between space-y-3 bg-white hover:shadow-md transition">
+            <div class="border rounded-xl p-4 flex flex-col justify-between space-y-3 bg-white hover:shadow-md transition relative">
+              ${isOutOfStock ? `<span class="absolute top-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold z-10 shadow">售完/缺貨中</span>` : ''}
               <div>
                 <div class="relative group cursor-pointer overflow-hidden rounded-lg mb-3" onclick="openImageModal('${item.imageUrl}')">
-                  <img src="${item.imageUrl}" class="w-full h-44 object-cover group-hover:scale-105 transition duration-200" alt="${item.productName}">
+                  <img src="${item.imageUrl}" class="w-full h-44 object-cover group-hover:scale-105 transition duration-200 ${isOutOfStock ? 'grayscale opacity-75' : ''}" alt="${item.productName}">
                   <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition">
                     🔍 點擊看全圖
                   </div>
@@ -375,7 +390,7 @@
       });
     });
 
-    // 團員個人歷史訂單列表
+    // 個人歷史訂單列表
     onAuthStateChanged(auth, (user) => {
       renderCart();
       if (!user) {

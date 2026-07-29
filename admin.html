@@ -18,22 +18,25 @@
 
   <main class="max-w-5xl mx-auto p-4 sm:p-6">
     <!-- 頁籤列 -->
-    <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg overflow-hidden shadow-sm">
-      <button id="tab-add-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white">
+    <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg overflow-hidden shadow-sm flex-wrap">
+      <button id="tab-add-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white text-sm">
         ➕ 上架商品
       </button>
-      <button id="tab-proxy-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-        🙋 團主代下單/新增訂單
+      <button id="tab-manage-products-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
+        🏷️ 管理/編輯已上架商品
       </button>
-      <button id="tab-members-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+      <button id="tab-proxy-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
+        🙋 團主代下單
+      </button>
+      <button id="tab-members-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
         👥 團員名單
       </button>
-      <button id="tab-orders-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-        📦 訂單管理 & 歷程
+      <button id="tab-orders-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
+        📦 訂單管理
       </button>
     </div>
 
-    <!-- 頁籤 1: 商品上架 (支援無限動態選項) -->
+    <!-- 頁籤 1: 商品上架 -->
     <div id="section-add-product" class="bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">新增團購商品</h2>
       <form id="add-product-form" class="space-y-4 max-w-xl">
@@ -60,9 +63,7 @@
             </button>
           </div>
 
-          <div id="options-container" class="space-y-2">
-            <!-- JS 動態生成選項 -->
-          </div>
+          <div id="options-container" class="space-y-2"></div>
         </div>
 
         <button type="submit" id="submit-btn" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 transition shadow mt-4">
@@ -71,7 +72,15 @@
       </form>
     </div>
 
-    <!-- 頁籤 2: 團主幫團員代下單 / 手動新增 -->
+    <!-- 頁籤 2: 管理/編輯已上架商品 (新增) -->
+    <div id="section-manage-products" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
+      <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🏷️ 已上架商品管理（修改品相 / 缺貨 / 下架）</h2>
+      <div id="admin-products-list" class="space-y-4">
+        <p class="text-gray-500 text-sm">載入商品列表中...</p>
+      </div>
+    </div>
+
+    <!-- 頁籤 3: 團主幫團員代下單 -->
     <div id="section-proxy" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🙋 團主協助團員手動新增訂單</h2>
       <form id="proxy-order-form" class="space-y-4 max-w-xl">
@@ -98,7 +107,7 @@
       </form>
     </div>
 
-    <!-- 頁籤 3: 團員名單 -->
+    <!-- 頁籤 4: 團員名單 -->
     <div id="section-members" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">已註冊團員名單</h2>
       <div id="member-list-container">
@@ -106,7 +115,7 @@
       </div>
     </div>
 
-    <!-- 頁籤 4: 訂單管理 -->
+    <!-- 頁籤 5: 訂單管理 -->
     <div id="section-orders" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <div class="flex justify-between items-center mb-4 border-b pb-2">
         <h2 class="text-xl font-bold text-gray-700">📦 訂單總覽與紀錄</h2>
@@ -120,6 +129,44 @@
       </div>
     </div>
   </main>
+
+  <!-- 編輯商品 Modal -->
+  <div id="edit-product-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-lg font-bold text-gray-800">✏️ 編輯商品與款式</h3>
+        <button onclick="closeEditProductModal()" class="text-gray-400 text-2xl font-bold">&times;</button>
+      </div>
+
+      <form id="edit-product-form" class="space-y-3">
+        <input type="hidden" id="edit-prod-id">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">團購/店家品牌</label>
+          <input type="text" id="edit-store-title" required class="w-full border rounded p-2 text-xs">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">商品名稱</label>
+          <input type="text" id="edit-product-name" required class="w-full border rounded p-2 text-xs">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">圖片網址</label>
+          <input type="url" id="edit-product-img-url" class="w-full border rounded p-2 text-xs">
+        </div>
+
+        <div class="space-y-2 pt-2 border-t">
+          <div class="flex justify-between items-center">
+            <label class="block text-xs font-bold text-gray-700">款式選項管理</label>
+            <button type="button" onclick="addEditOptionRow()" class="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-1 rounded border">➕ 新增規格</button>
+          </div>
+          <div id="edit-options-container" class="space-y-2"></div>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition text-sm mt-4">
+          儲存商品修改
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- 合併訂單 Modal -->
   <div id="merge-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
@@ -151,6 +198,7 @@
   <script>
     const tabs = [
       { btn: 'tab-add-btn', sec: 'section-add-product' },
+      { btn: 'tab-manage-products-btn', sec: 'section-manage-products' },
       { btn: 'tab-proxy-btn', sec: 'section-proxy' },
       { btn: 'tab-members-btn', sec: 'section-members' },
       { btn: 'tab-orders-btn', sec: 'section-orders' }
@@ -159,10 +207,10 @@
     tabs.forEach(t => {
       document.getElementById(t.btn).addEventListener('click', () => {
         tabs.forEach(item => {
-          document.getElementById(item.btn).className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700";
+          document.getElementById(item.btn).className = "flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm";
           document.getElementById(item.sec).classList.add('hidden');
         });
-        document.getElementById(t.btn).className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white";
+        document.getElementById(t.btn).className = "flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white text-sm";
         document.getElementById(t.sec).classList.remove('hidden');
       });
     });

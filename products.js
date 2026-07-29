@@ -15,7 +15,7 @@ let cachedProductsList = [];
 let cachedOrdersList = [];
 let optionCount = 0;
 
-// 1. 動態增加款式選項列
+// 動態增加「新增商品」的款式選項列
 export const addOptionRow = (defaultName = "", defaultPrice = "") => {
   optionCount++;
   const container = document.getElementById('options-container');
@@ -31,10 +31,9 @@ export const addOptionRow = (defaultName = "", defaultPrice = "") => {
       <span class="text-gray-400 text-xs mr-1">NT$</span>
       <input type="number" class="opt-price w-full border-none p-1.5 text-xs focus:outline-none" placeholder="價格" value="${defaultPrice}" required>
     </div>
-    <button type="button" class="delete-opt-btn text-red-500 hover:text-red-700 text-sm px-1.5 font-bold" title="刪除此選項">&times;</button>
+    <button type="button" class="delete-opt-btn text-red-500 hover:text-red-700 text-sm px-1.5 font-bold" title="刪除">&times;</button>
   `;
 
-  // 刪除按鈕綁定
   row.querySelector('.delete-opt-btn').addEventListener('click', () => {
     if (container.querySelectorAll('.option-row').length <= 1) {
       alert("商品至少需要保留一個款式選項！");
@@ -46,15 +45,40 @@ export const addOptionRow = (defaultName = "", defaultPrice = "") => {
   container.appendChild(row);
 };
 
-// 掛載到全域 Window
 window.addOptionRow = addOptionRow;
 
-// 頁面初次載入綁定按鈕與預設選項
+// 動態增加「編輯 Modal」內部的款式選項列
+window.addEditOptionRow = (defaultName = "", defaultPrice = "") => {
+  const container = document.getElementById('edit-options-container');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = "flex gap-2 items-center bg-gray-50 p-2 rounded border edit-option-row";
+
+  row.innerHTML = `
+    <input type="text" class="edit-opt-name w-2/3 border rounded p-1.5 text-xs" placeholder="款式名稱" value="${defaultName}" required>
+    <div class="w-1/3 flex items-center bg-white border rounded px-2">
+      <span class="text-gray-400 text-xs mr-1">$</span>
+      <input type="number" class="edit-opt-price w-full border-none p-1 text-xs focus:outline-none" placeholder="價格" value="${defaultPrice}" required>
+    </div>
+    <button type="button" class="delete-edit-opt-btn text-red-500 hover:text-red-700 text-sm px-1 font-bold">&times;</button>
+  `;
+
+  row.querySelector('.delete-edit-opt-btn').addEventListener('click', () => {
+    if (container.querySelectorAll('.edit-option-row').length <= 1) {
+      alert("商品至少需要保留一個款式選項！");
+      return;
+    }
+    row.remove();
+  });
+
+  container.appendChild(row);
+};
+
+// 頁面初始化
 document.addEventListener('DOMContentLoaded', () => {
   const addBtn = document.getElementById('add-option-btn');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => addOptionRow());
-  }
+  if (addBtn) addBtn.addEventListener('click', () => addOptionRow());
 
   const container = document.getElementById('options-container');
   if (container && container.children.length === 0) {
@@ -63,27 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// 如果 Module 載入時 DOM 已經 Ready，補做一次初始化
-if (document.getElementById('options-container') && document.getElementById('options-container').children.length === 0) {
-  addOptionRow("盲抽一抽", "300");
-  addOptionRow("端盒", "2950");
-}
-
-const addBtn = document.getElementById('add-option-btn');
-if (addBtn) {
-  addBtn.onclick = () => addOptionRow();
-}
-
-// 2. 上架商品 (打包所有動態產生的選項)
+// 1. 上架商品
 const form = document.getElementById('add-product-form');
 if (form) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
-    if (!currentUser || currentUser.email !== ADMIN_EMAIL) {
-      alert("權限不足！僅有團主可以執行上架操作。");
-      return;
-    }
+    if (!currentUser || currentUser.email !== ADMIN_EMAIL) return alert("權限不足！");
 
     const submitBtn = document.getElementById('submit-btn');
     submitBtn.disabled = true;
@@ -100,8 +110,7 @@ if (form) {
       }
 
       const options = [];
-      const rows = document.querySelectorAll('.option-row');
-      rows.forEach((row, idx) => {
+      document.querySelectorAll('.option-row').forEach((row, idx) => {
         const nameInput = row.querySelector('.opt-name');
         const priceInput = row.querySelector('.opt-price');
         if (nameInput && priceInput && nameInput.value.trim() !== "") {
@@ -116,7 +125,6 @@ if (form) {
       if (options.length === 0) {
         alert("請至少填寫一個有效的商品規格！");
         submitBtn.disabled = false;
-        submitBtn.innerText = "確認發布商品";
         return;
       }
 
@@ -125,13 +133,12 @@ if (form) {
         productName,
         imageUrl: imageUrl || "https://via.placeholder.com/300?text=No+Image",
         options,
-        status: "active",
+        status: "active", // active (正常上架中), out_of_stock (缺貨/售完), archived (已下架)
         createdAt: serverTimestamp(),
         createdBy: currentUser.email
       });
 
-      alert(`🎉 商品【${productName}】已成功上架！包含 ${options.length} 個款式選項。`);
-      
+      alert(`🎉 商品【${productName}】已成功上架！`);
       form.reset();
       document.getElementById('options-container').innerHTML = "";
       addOptionRow("盲抽一抽", "300");
@@ -145,35 +152,181 @@ if (form) {
   });
 }
 
+// 2. 開團商品監聽與管理列表 (新增/編輯/缺貨/下架機制)
+const adminProductsContainer = document.getElementById('admin-products-list');
+onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
+  cachedProductsList = [];
+  const proxyProductSelect = document.getElementById('proxy-product-select');
+  let selectHtml = `<option value="">-- 請選擇商品與規格 --</option>`;
+
+  if (snapshot.empty) {
+    if (adminProductsContainer) adminProductsContainer.innerHTML = "<p class='text-gray-500'>目前資料庫中無任何商品。</p>";
+    if (proxyProductSelect) proxyProductSelect.innerHTML = selectHtml;
+    return;
+  }
+
+  let adminHtml = "";
+
+  snapshot.forEach(docSnap => {
+    const prod = { id: docSnap.id, ...docSnap.data() };
+    cachedProductsList.push(prod);
+
+    // proxy 選項 (只列出未下架的)
+    if (prod.status !== "archived") {
+      (prod.options || []).forEach((opt, idx) => {
+        selectHtml += `<option value="${prod.id}___${idx}">【${prod.storeTitle}】${prod.productName} - ${opt.name} ($${opt.price})</option>`;
+      });
+    }
+
+    // 後台管理清單卡片渲染
+    let statusBadge = `<span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-bold">🟢 上架中</span>`;
+    if (prod.status === "out_of_stock") {
+      statusBadge = `<span class="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded font-bold">🔴 缺貨/售完</span>`;
+    } else if (prod.status === "archived") {
+      statusBadge = `<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded font-bold">⚪ 已下架 (前台隱藏)</span>`;
+    }
+
+    const optionsStr = (prod.options || []).map(o => `${o.name} ($${o.price})`).join(' | ');
+
+    adminHtml += `
+      <div class="p-4 border rounded-xl bg-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div class="flex items-center gap-3">
+          <img src="${prod.imageUrl}" class="w-16 h-16 object-cover rounded-lg border">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">${prod.storeTitle}</span>
+              ${statusBadge}
+            </div>
+            <h4 class="font-bold text-gray-900">${prod.productName}</h4>
+            <p class="text-xs text-gray-500 mt-1">規格：${optionsStr}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+          <button onclick="openEditProductModal('${prod.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded border font-bold">
+            ✏️ 編輯商品/品相
+          </button>
+          
+          ${prod.status === 'out_of_stock' ? `
+            <button onclick="changeProductStatus('${prod.id}', 'active')" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded border font-bold">
+              🟢 恢復補貨上架
+            </button>
+          ` : `
+            <button onclick="changeProductStatus('${prod.id}', 'out_of_stock')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded border font-bold">
+              🚫 標記缺貨
+            </button>
+          `}
+
+          ${prod.status === 'archived' ? `
+            <button onclick="changeProductStatus('${prod.id}', 'active')" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded border font-bold">
+              ⬆️ 重新上架
+            </button>
+          ` : `
+            <button onclick="changeProductStatus('${prod.id}', 'archived')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border font-bold">
+              📦 移至下架
+            </button>
+          `}
+        </div>
+      </div>
+    `;
+  });
+
+  if (adminProductsContainer) adminProductsContainer.innerHTML = adminHtml;
+  if (proxyProductSelect) proxyProductSelect.innerHTML = selectHtml;
+});
+
+// 切換商品狀態 (active / out_of_stock / archived)
+window.changeProductStatus = async (productId, newStatus) => {
+  try {
+    await updateDoc(doc(db, "products", productId), { status: newStatus });
+    alert("✅ 商品狀態已更新！");
+  } catch (e) {
+    alert("更新狀態失敗：" + e.message);
+  }
+};
+
+// 開啟商品編輯彈窗
+window.openEditProductModal = (productId) => {
+  const prod = cachedProductsList.find(p => p.id === productId);
+  if (!prod) return;
+
+  document.getElementById('edit-prod-id').value = prod.id;
+  document.getElementById('edit-store-title').value = prod.storeTitle || '';
+  document.getElementById('edit-product-name').value = prod.productName || '';
+  document.getElementById('edit-product-img-url').value = prod.imageUrl || '';
+
+  const container = document.getElementById('edit-options-container');
+  container.innerHTML = "";
+
+  (prod.options || []).forEach(opt => {
+    window.addEditOptionRow(opt.name, opt.price);
+  });
+
+  document.getElementById('edit-product-modal').classList.remove('hidden');
+};
+
+window.closeEditProductModal = () => document.getElementById('edit-product-modal').classList.add('hidden');
+
+// 送出商品編輯
+const editForm = document.getElementById('edit-product-form');
+if (editForm) {
+  editForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const productId = document.getElementById('edit-prod-id').value;
+    const storeTitle = document.getElementById('edit-store-title').value.trim();
+    const productName = document.getElementById('edit-product-name').value.trim();
+    const imageUrl = document.getElementById('edit-product-img-url').value.trim();
+
+    const options = [];
+    document.querySelectorAll('.edit-option-row').forEach((row, idx) => {
+      const nameInput = row.querySelector('.edit-opt-name');
+      const priceInput = row.querySelector('.edit-opt-price');
+      if (nameInput && priceInput && nameInput.value.trim() !== "") {
+        options.push({
+          id: `opt_${idx + 1}`,
+          name: nameInput.value.trim(),
+          price: Number(priceInput.value)
+        });
+      }
+    });
+
+    if (options.length === 0) return alert("請至少留一個款式選項！");
+
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        storeTitle,
+        productName,
+        imageUrl: imageUrl || "https://via.placeholder.com/300?text=No+Image",
+        options
+      });
+      alert("🎉 商品資料修改成功！");
+      closeEditProductModal();
+    } catch (err) {
+      alert("修改失敗：" + err.message);
+    }
+  });
+}
+
 // 3. 代下單
 const proxyForm = document.getElementById('proxy-order-form');
 if (proxyForm) {
   proxyForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
-    if (!currentUser || currentUser.email !== ADMIN_EMAIL) {
-      alert("僅有團主可新增訂單！");
-      return;
-    }
+    if (!currentUser || currentUser.email !== ADMIN_EMAIL) return alert("權限不足！");
 
     const userVal = document.getElementById('proxy-user-select').value;
     const prodVal = document.getElementById('proxy-product-select').value;
     const qtyVal = Number(document.getElementById('proxy-qty').value);
 
-    if (!userVal || !prodVal) {
-      alert("請完整選擇團員與商品選項！");
-      return;
-    }
+    if (!userVal || !prodVal) return alert("請完整選擇團員與商品選項！");
 
     const targetUser = cachedUsersMap[userVal] || { uid: userVal, nickname: "團員", email: "團主新增" };
     const [pId, optIndexStr] = prodVal.split('___');
     const targetProduct = cachedProductsList.find(p => p.id === pId);
     const targetOption = targetProduct ? targetProduct.options[Number(optIndexStr)] : null;
 
-    if (!targetProduct || !targetOption) {
-      alert("找不到商品規格！");
-      return;
-    }
+    if (!targetProduct || !targetOption) return alert("找不到商品規格！");
 
     try {
       await addDoc(collection(db, "orders"), {
@@ -246,24 +399,6 @@ onSnapshot(collection(db, "users"), (snapshot) => {
   if(proxyUserSelect) proxyUserSelect.innerHTML = selectHtml;
 });
 
-// 5. 開團商品監聽
-onSnapshot(collection(db, "products"), (snapshot) => {
-  cachedProductsList = [];
-  const proxyProductSelect = document.getElementById('proxy-product-select');
-  let selectHtml = `<option value="">-- 請選擇商品與規格 --</option>`;
-
-  snapshot.forEach(docSnap => {
-    const prod = { id: docSnap.id, ...docSnap.data() };
-    cachedProductsList.push(prod);
-
-    (prod.options || []).forEach((opt, idx) => {
-      selectHtml += `<option value="${prod.id}___${idx}">【${prod.storeTitle}】${prod.productName} - ${opt.name} ($${opt.price})</option>`;
-    });
-  });
-
-  if(proxyProductSelect) proxyProductSelect.innerHTML = selectHtml;
-});
-
 window.editNickname = async (userId, oldNickname) => {
   const newNickname = prompt("修改團員暱稱：", oldNickname);
   if (newNickname && newNickname.trim() !== "") {
@@ -276,7 +411,7 @@ window.editNickname = async (userId, oldNickname) => {
   }
 };
 
-// 6. 編輯訂單
+// 5. 編輯訂單
 window.editOrderFull = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
@@ -319,7 +454,7 @@ window.editOrderFull = async (orderId) => {
   }
 };
 
-// 7. 取消/刪除訂單
+// 6. 取消/刪除訂單
 window.cancelOrder = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
@@ -350,7 +485,7 @@ window.cancelOrder = async (orderId) => {
   }
 };
 
-// 8. 合併訂單彈窗與執行
+// 7. 合併訂單彈窗與執行
 window.openMergeModal = () => {
   const sourceSel = document.getElementById('merge-source-select');
   const targetSel = document.getElementById('merge-target-select');
@@ -403,7 +538,7 @@ window.executeMergeOrders = async () => {
   }
 };
 
-// 9. 訂單總覽監聽與渲染
+// 8. 訂單總覽監聽與渲染
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
