@@ -13,8 +13,68 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
 let cachedUsersMap = {};
 let cachedProductsList = [];
 let cachedOrdersList = [];
+let optionCount = 0;
 
-// 1. 商品發布
+// 1. 動態增加款式選項列
+export const addOptionRow = (defaultName = "", defaultPrice = "") => {
+  optionCount++;
+  const container = document.getElementById('options-container');
+  if (!container) return;
+
+  const row = document.createElement('div');
+  row.className = "flex gap-2 items-center bg-gray-50 p-2.5 rounded-lg border border-gray-200 option-row";
+  row.id = `opt-row-${optionCount}`;
+
+  row.innerHTML = `
+    <input type="text" class="opt-name w-2/3 border rounded p-2 text-xs" placeholder="款式名稱 (例: 盲抽一抽)" value="${defaultName}" required>
+    <div class="w-1/3 flex items-center bg-white border rounded px-2">
+      <span class="text-gray-400 text-xs mr-1">NT$</span>
+      <input type="number" class="opt-price w-full border-none p-1.5 text-xs focus:outline-none" placeholder="價格" value="${defaultPrice}" required>
+    </div>
+    <button type="button" class="delete-opt-btn text-red-500 hover:text-red-700 text-sm px-1.5 font-bold" title="刪除此選項">&times;</button>
+  `;
+
+  // 刪除按鈕綁定
+  row.querySelector('.delete-opt-btn').addEventListener('click', () => {
+    if (container.querySelectorAll('.option-row').length <= 1) {
+      alert("商品至少需要保留一個款式選項！");
+      return;
+    }
+    row.remove();
+  });
+
+  container.appendChild(row);
+};
+
+// 掛載到全域 Window
+window.addOptionRow = addOptionRow;
+
+// 頁面初次載入綁定按鈕與預設選項
+document.addEventListener('DOMContentLoaded', () => {
+  const addBtn = document.getElementById('add-option-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => addOptionRow());
+  }
+
+  const container = document.getElementById('options-container');
+  if (container && container.children.length === 0) {
+    addOptionRow("盲抽一抽", "300");
+    addOptionRow("端盒", "2950");
+  }
+});
+
+// 如果 Module 載入時 DOM 已經 Ready，補做一次初始化
+if (document.getElementById('options-container') && document.getElementById('options-container').children.length === 0) {
+  addOptionRow("盲抽一抽", "300");
+  addOptionRow("端盒", "2950");
+}
+
+const addBtn = document.getElementById('add-option-btn');
+if (addBtn) {
+  addBtn.onclick = () => addOptionRow();
+}
+
+// 2. 上架商品 (打包所有動態產生的選項)
 const form = document.getElementById('add-product-form');
 if (form) {
   form.addEventListener('submit', async (e) => {
@@ -40,13 +100,25 @@ if (form) {
       }
 
       const options = [];
-      const optName1 = document.getElementById('opt-name-1').value.trim();
-      const optPrice1 = document.getElementById('opt-price-1').value;
-      if (optName1) options.push({ id: "opt_1", name: optName1, price: Number(optPrice1) });
+      const rows = document.querySelectorAll('.option-row');
+      rows.forEach((row, idx) => {
+        const nameInput = row.querySelector('.opt-name');
+        const priceInput = row.querySelector('.opt-price');
+        if (nameInput && priceInput && nameInput.value.trim() !== "") {
+          options.push({
+            id: `opt_${idx + 1}`,
+            name: nameInput.value.trim(),
+            price: Number(priceInput.value)
+          });
+        }
+      });
 
-      const optName2 = document.getElementById('opt-name-2').value.trim();
-      const optPrice2 = document.getElementById('opt-price-2').value;
-      if (optName2) options.push({ id: "opt_2", name: optName2, price: Number(optPrice2) });
+      if (options.length === 0) {
+        alert("請至少填寫一個有效的商品規格！");
+        submitBtn.disabled = false;
+        submitBtn.innerText = "確認發布商品";
+        return;
+      }
 
       await addDoc(collection(db, "products"), {
         storeTitle,
@@ -58,8 +130,12 @@ if (form) {
         createdBy: currentUser.email
       });
 
-      alert("🎉 商品上架成功！");
+      alert(`🎉 商品【${productName}】已成功上架！包含 ${options.length} 個款式選項。`);
+      
       form.reset();
+      document.getElementById('options-container').innerHTML = "";
+      addOptionRow("盲抽一抽", "300");
+      addOptionRow("端盒", "2950");
     } catch (error) {
       alert("上架失敗：" + error.message);
     } finally {
@@ -69,7 +145,7 @@ if (form) {
   });
 }
 
-// 2. 代下單/新增訂單
+// 3. 代下單
 const proxyForm = document.getElementById('proxy-order-form');
 if (proxyForm) {
   proxyForm.addEventListener('submit', async (e) => {
@@ -126,7 +202,7 @@ if (proxyForm) {
   });
 }
 
-// 3. 團員名單監聽
+// 4. 團員名單監聽
 const memberListContainer = document.getElementById('member-list-container');
 onSnapshot(collection(db, "users"), (snapshot) => {
   cachedUsersMap = {};
@@ -170,7 +246,7 @@ onSnapshot(collection(db, "users"), (snapshot) => {
   if(proxyUserSelect) proxyUserSelect.innerHTML = selectHtml;
 });
 
-// 4. 開團商品監聽
+// 5. 開團商品監聽
 onSnapshot(collection(db, "products"), (snapshot) => {
   cachedProductsList = [];
   const proxyProductSelect = document.getElementById('proxy-product-select');
@@ -200,7 +276,7 @@ window.editNickname = async (userId, oldNickname) => {
   }
 };
 
-// 5. 編輯訂單全欄位 (包含商品、數量、單價、狀態)
+// 6. 編輯訂單
 window.editOrderFull = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
@@ -243,7 +319,7 @@ window.editOrderFull = async (orderId) => {
   }
 };
 
-// 6. 取消/刪除訂單
+// 7. 取消/刪除訂單
 window.cancelOrder = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
@@ -274,7 +350,7 @@ window.cancelOrder = async (orderId) => {
   }
 };
 
-// 7. 合併訂單彈窗與執行
+// 8. 合併訂單彈窗與執行
 window.openMergeModal = () => {
   const sourceSel = document.getElementById('merge-source-select');
   const targetSel = document.getElementById('merge-target-select');
@@ -327,7 +403,7 @@ window.executeMergeOrders = async () => {
   }
 };
 
-// 8. 訂單總覽監聽與渲染
+// 9. 訂單總覽監聽與渲染
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
