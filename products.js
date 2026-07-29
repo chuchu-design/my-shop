@@ -3,7 +3,6 @@ import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 
 
 const ADMIN_EMAIL = "chuchu20011225@gmail.com";
 
-// Base64 圖片轉碼
 const fileToBase64 = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.readAsDataURL(file);
@@ -11,7 +10,7 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
   reader.onerror = (error) => reject(error);
 });
 
-// 1. 商品上架邏輯
+// 1. 後台商品發布
 const form = document.getElementById('add-product-form');
 if (form) {
   form.addEventListener('submit', async (e) => {
@@ -36,10 +35,14 @@ if (form) {
         imageUrl = await fileToBase64(fileInput.files[0]);
       }
 
-      const options = [
-        { id: "opt_1", name: document.getElementById('opt-name-1').value.trim(), price: Number(document.getElementById('opt-price-1').value) },
-        { id: "opt_2", name: document.getElementById('opt-name-2').value.trim(), price: Number(document.getElementById('opt-price-2').value) }
-      ];
+      const options = [];
+      const optName1 = document.getElementById('opt-name-1').value.trim();
+      const optPrice1 = document.getElementById('opt-price-1').value;
+      if (optName1) options.push({ id: "opt_1", name: optName1, price: Number(optPrice1) });
+
+      const optName2 = document.getElementById('opt-name-2').value.trim();
+      const optPrice2 = document.getElementById('opt-price-2').value;
+      if (optName2) options.push({ id: "opt_2", name: optName2, price: Number(optPrice2) });
 
       await addDoc(collection(db, "products"), {
         storeTitle,
@@ -63,12 +66,12 @@ if (form) {
   });
 }
 
-// 2. 即時連動團員名單 (Firestore 'users' 集合)
+// 2. 即時載入團員名單 (Firestore 'users' 集合)
 const memberListContainer = document.getElementById('member-list-container');
 if (memberListContainer) {
   onSnapshot(collection(db, "users"), (snapshot) => {
     if (snapshot.empty) {
-      memberListContainer.innerHTML = "<p class='text-gray-500'>目前資料庫中尚無團員資料。</p>";
+      memberListContainer.innerHTML = "<p class='text-gray-500'>目前無任何註冊團員。</p>";
       return;
     }
     let html = `<div class='divide-y border rounded-lg overflow-hidden bg-white shadow-sm'>`;
@@ -88,11 +91,11 @@ if (memberListContainer) {
     memberListContainer.innerHTML = html;
   }, (err) => {
     console.error("讀取團員失敗：", err);
-    memberListContainer.innerHTML = `<p class='text-red-500 p-2'>載入團員失敗 (${err.message})，請檢查 Firestore 安全規則或 key 是否正確。</p>`;
+    memberListContainer.innerHTML = `<p class='text-red-500 p-2'>載入團員失敗 (${err.message})</p>`;
   });
 }
 
-// 3. 即時連動訂單紀錄 (Firestore 'orders' 集合)
+// 3. 即時載入訂單 (Firestore 'orders' 集合)
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
