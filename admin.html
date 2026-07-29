@@ -1,184 +1,20 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>團主後台 - 代購網站</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen">
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.x.x/firebase-auth.js";
 
-  <!-- 未驗證遮罩 -->
-  <div id="admin-auth-modal" class="fixed inset-0 bg-slate-900 bg-opacity-95 flex items-center justify-center z-50 p-4">
-    <div class="bg-white p-6 rounded-xl max-w-sm w-full text-center shadow-2xl">
-      <h2 class="text-xl font-bold text-gray-800 mb-2">🔒 團主專屬後台</h2>
-      <p class="text-sm text-gray-500 mb-6" id="auth-status-text">請先以團主 Google 帳號登入系統</p>
-      
-      <button id="admin-login-btn" onclick="handleGoogleLogin()" class="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-bold hover:bg-indigo-700 transition">
-        Google 登入驗證
-      </button>
+const auth = getAuth();
+const ADMIN_EMAIL = "chuchu20011225@gmail.com";
 
-      <div class="mt-4 border-t pt-4">
-        <a href="index.html" class="text-sm text-gray-400 hover:text-gray-600">← 返回商品大廳</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- 團主後台內容 -->
-  <div id="admin-content" class="hidden flex flex-col md:flex-row min-h-screen">
-    <!-- 電腦側邊欄 -->
-    <aside class="hidden md:flex flex-col w-64 bg-slate-800 text-white min-h-screen p-4">
-      <h1 class="text-xl font-bold mb-6 text-amber-400">👑 團主後台</h1>
-      <nav class="flex flex-col space-y-2">
-        <a href="admin.html" class="p-3 rounded-lg bg-slate-700 text-amber-400 font-bold">📊 統計總覽與名冊</a>
-        <a href="index.html" class="p-3 rounded-lg hover:bg-slate-700 text-gray-300">🛒 返回賣場</a>
-      </nav>
-      <div class="mt-auto pt-4 border-t border-slate-700 text-xs text-slate-400" id="admin-user-display">
-        團主已驗證
-      </div>
-    </aside>
-
-    <!-- 主要內容區 -->
-    <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0 space-y-8">
-      <div class="flex justify-between items-center">
-        <h2 class="text-2xl font-bold text-gray-800">團主數據中心</h2>
-        <button onclick="handleLogout()" class="text-sm bg-slate-200 hover:bg-slate-300 text-gray-700 px-3 py-1.5 rounded-lg">登出帳號</button>
-      </div>
-
-      <!-- 1. 團員總名冊表 (團主獨有修改暱稱功能) -->
-      <div class="bg-white rounded-xl shadow-sm border p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-bold text-gray-800">👥 團員總名冊</h3>
-          <span class="text-xs text-gray-500">團員無法自行修改暱稱，僅團主可在此修改</span>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="border-b text-gray-500 text-sm bg-gray-50">
-                <th class="p-3">團員暱稱</th>
-                <th class="p-3">Google Email</th>
-                <th class="p-3">加入時間</th>
-                <th class="p-3 text-center">操作</th>
-              </tr>
-            </thead>
-            <tbody id="admin-members-table">
-              <tr>
-                <td colspan="4" class="p-4 text-center text-gray-400">團員資料載入中...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 2. 下單總量統計表 -->
-      <div class="bg-white rounded-xl shadow-sm border p-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-4">📦 團員訂單明細紀錄</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse">
-            <thead>
-              <tr class="border-b text-gray-500 text-sm bg-gray-50">
-                <th class="p-3">下單團員</th>
-                <th class="p-3">商品名稱</th>
-                <th class="p-3">數量</th>
-                <th class="p-3">總金額</th>
-                <th class="p-3">下單時間</th>
-              </tr>
-            </thead>
-            <tbody id="admin-orders-table">
-              <tr>
-                <td colspan="5" class="p-4 text-center text-gray-400">尚無下單資料</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-
-    <!-- 手機底部捷徑 -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-800 text-white flex justify-around p-2 text-xs text-center z-10">
-      <a href="index.html" class="flex-1 py-1">🛒<br>賣場</a>
-      <a href="admin.html" class="flex-1 py-1 text-amber-400 font-bold">👑<br>後台</a>
-    </nav>
-  </div>
-
-  <!-- 邏輯腳本 -->
-  <script type="module">
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    import "./auth.js";
-
-    const auth = getAuth();
-    const db = getFirestore();
-
-    // 監聽登入狀態
-    onAuthStateChanged(auth, async (user) => {
-      const modal = document.getElementById('admin-auth-modal');
-      const content = document.getElementById('admin-content');
-      const userDisplay = document.getElementById('admin-user-display');
-
-      if (user) {
-        modal.classList.add('hidden');
-        content.classList.remove('hidden');
-        if (userDisplay) userDisplay.innerText = `👑 團主：${user.displayName || user.email}`;
-        
-        // 載入團員名冊
-        loadMembersList();
-      } else {
-        modal.classList.remove('hidden');
-        content.classList.add('hidden');
-      }
-    });
-
-    // 載入所有團員資料
-    async function loadMembersList() {
-      const tableBody = document.getElementById('admin-members-table');
-      try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        if (querySnapshot.empty) {
-          tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400">目前尚無註冊團員</td></tr>`;
-          return;
-        }
-
-        let html = '';
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const createdDate = data.createdAt ? new Date(data.createdAt).toLocaleDateString() : '未知';
-          
-          html += `
-            <tr class="border-b text-sm hover:bg-gray-50">
-              <td class="p-3 font-bold text-indigo-600">${data.nickname || '未設定'}</td>
-              <td class="p-3 text-gray-600">${data.email || '無'}</td>
-              <td class="p-3 text-gray-400">${createdDate}</td>
-              <td class="p-3 text-center">
-                <button onclick="editNickname('${data.uid}', '${data.nickname}')" class="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded text-xs font-medium">
-                  ✏️ 修改暱稱
-                </button>
-              </td>
-            </tr>
-          `;
-        });
-        tableBody.innerHTML = html;
-      } catch (error) {
-        console.error("載入名冊失敗:", error);
-        tableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">載入失敗，請稍後重試</td></tr>`;
-      }
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // 檢查登入者的 Email 是否為團主
+    if (user.email !== ADMIN_EMAIL) {
+      alert("警告：您沒有管理員權限！");
+      window.location.href = "index.html"; // 強制踢回首頁
+    } else {
+      console.log("團主身分驗證成功，允許進入後台");
+      // 這裡載入後台資料...
     }
-
-    // 團主修改團員暱稱功能
-    window.editNickname = async function(uid, oldNickname) {
-      const newNickname = prompt(`修改團員舊暱稱【${oldNickname}】為：`, oldNickname);
-      if (newNickname && newNickname.trim() !== "" && newNickname !== oldNickname) {
-        try {
-          const userRef = doc(db, "users", uid);
-          await updateDoc(userRef, { nickname: newNickname.trim() });
-          alert("暱稱修改成功！");
-          loadMembersList(); // 重新整理列表
-        } catch (error) {
-          console.error("修改暱稱失敗:", error);
-          alert("修改失敗，請稍後重試！");
-        }
-      }
-    };
-  </script>
-</body>
-</html>
+  } else {
+    // 未登入也踢回首頁
+    window.location.href = "index.html";
+  }
+});
