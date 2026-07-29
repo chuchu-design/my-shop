@@ -47,8 +47,8 @@ export const addOptionRow = (defaultName = "", defaultPrice = "") => {
 
 window.addOptionRow = addOptionRow;
 
-// 動態增加「編輯 Modal」內部的款式選項列
-window.addEditOptionRow = (defaultName = "", defaultPrice = "") => {
+// 動態增加「編輯 Modal」內部的款式選項列 (包含單項缺貨勾選)
+window.addEditOptionRow = (defaultName = "", defaultPrice = "", isOutOfStock = false) => {
   const container = document.getElementById('edit-options-container');
   if (!container) return;
 
@@ -56,11 +56,15 @@ window.addEditOptionRow = (defaultName = "", defaultPrice = "") => {
   row.className = "flex gap-2 items-center bg-gray-50 p-2 rounded border edit-option-row";
 
   row.innerHTML = `
-    <input type="text" class="edit-opt-name w-2/3 border rounded p-1.5 text-xs" placeholder="款式名稱" value="${defaultName}" required>
-    <div class="w-1/3 flex items-center bg-white border rounded px-2">
-      <span class="text-gray-400 text-xs mr-1">$</span>
+    <input type="text" class="edit-opt-name w-1/2 border rounded p-1.5 text-xs" placeholder="款式名稱" value="${defaultName}" required>
+    <div class="w-1/4 flex items-center bg-white border rounded px-1.5">
+      <span class="text-gray-400 text-xs mr-0.5">$</span>
       <input type="number" class="edit-opt-price w-full border-none p-1 text-xs focus:outline-none" placeholder="價格" value="${defaultPrice}" required>
     </div>
+    <label class="flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold text-red-600 bg-red-50 p-1 rounded border border-red-200">
+      <input type="checkbox" class="edit-opt-stock focus:ring-0" ${isOutOfStock ? 'checked' : ''}>
+      缺貨
+    </label>
     <button type="button" class="delete-edit-opt-btn text-red-500 hover:text-red-700 text-sm px-1 font-bold">&times;</button>
   `;
 
@@ -117,7 +121,8 @@ if (form) {
           options.push({
             id: `opt_${idx + 1}`,
             name: nameInput.value.trim(),
-            price: Number(priceInput.value)
+            price: Number(priceInput.value),
+            isOutOfStock: false
           });
         }
       });
@@ -133,7 +138,7 @@ if (form) {
         productName,
         imageUrl: imageUrl || "https://via.placeholder.com/300?text=No+Image",
         options,
-        status: "active", // active (正常上架中), out_of_stock (缺貨/售完), archived (已下架)
+        status: "active",
         createdAt: serverTimestamp(),
         createdBy: currentUser.email
       });
@@ -152,7 +157,7 @@ if (form) {
   });
 }
 
-// 2. 開團商品監聽與管理列表 (新增/編輯/缺貨/下架機制)
+// 2. 開團商品監聽與管理列表 (支援快捷開關單項缺貨)
 const adminProductsContainer = document.getElementById('admin-products-list');
 onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
   cachedProductsList = [];
@@ -171,22 +176,31 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
     const prod = { id: docSnap.id, ...docSnap.data() };
     cachedProductsList.push(prod);
 
-    // proxy 選項 (只列出未下架的)
+    // 代下單選單 (只列出未下架且未缺貨的)
     if (prod.status !== "archived") {
       (prod.options || []).forEach((opt, idx) => {
-        selectHtml += `<option value="${prod.id}___${idx}">【${prod.storeTitle}】${prod.productName} - ${opt.name} ($${opt.price})</option>`;
+        const stockLabel = opt.isOutOfStock ? " [缺貨中]" : "";
+        selectHtml += `<option value="${prod.id}___${idx}" ${opt.isOutOfStock ? 'disabled' : ''}>【${prod.storeTitle}】${prod.productName} - ${opt.name} ($${opt.price})${stockLabel}</option>`;
       });
     }
 
-    // 後台管理清單卡片渲染
+    // 款式選項與單獨缺貨按鈕列表
+    const optionsBadges = (prod.options || []).map((o, idx) => {
+      const isOut = !!o.isOutOfStock;
+      return `
+        <div class="flex items-center gap-1.5 bg-gray-50 border px-2 py-1 rounded text-xs">
+          <span class="${isOut ? 'line-through text-gray-400' : 'font-bold text-gray-700'}">${o.name} ($${o.price})</span>
+          <button onclick="toggleSingleOptionStock('${prod.id}', ${idx})" class="text-[10px] font-bold px-1.5 py-0.5 rounded border transition ${isOut ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}">
+            ${isOut ? '補貨' : '設缺貨'}
+          </button>
+        </div>
+      `;
+    }).join('');
+
     let statusBadge = `<span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-bold">🟢 上架中</span>`;
-    if (prod.status === "out_of_stock") {
-      statusBadge = `<span class="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded font-bold">🔴 缺貨/售完</span>`;
-    } else if (prod.status === "archived") {
+    if (prod.status === "archived") {
       statusBadge = `<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded font-bold">⚪ 已下架 (前台隱藏)</span>`;
     }
-
-    const optionsStr = (prod.options || []).map(o => `${o.name} ($${o.price})`).join(' | ');
 
     adminHtml += `
       <div class="p-4 border rounded-xl bg-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -198,32 +212,24 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
               ${statusBadge}
             </div>
             <h4 class="font-bold text-gray-900">${prod.productName}</h4>
-            <p class="text-xs text-gray-500 mt-1">規格：${optionsStr}</p>
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              ${optionsBadges}
+            </div>
           </div>
         </div>
 
         <div class="flex items-center gap-2 w-full md:w-auto justify-end">
           <button onclick="openEditProductModal('${prod.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded border font-bold">
-            ✏️ 編輯商品/品相
+            ✏️ 編輯商品全貌
           </button>
           
-          ${prod.status === 'out_of_stock' ? `
-            <button onclick="changeProductStatus('${prod.id}', 'active')" class="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded border font-bold">
-              🟢 恢復補貨上架
-            </button>
-          ` : `
-            <button onclick="changeProductStatus('${prod.id}', 'out_of_stock')" class="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded border font-bold">
-              🚫 標記缺貨
-            </button>
-          `}
-
           ${prod.status === 'archived' ? `
             <button onclick="changeProductStatus('${prod.id}', 'active')" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded border font-bold">
               ⬆️ 重新上架
             </button>
           ` : `
             <button onclick="changeProductStatus('${prod.id}', 'archived')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border font-bold">
-              📦 移至下架
+              📦 整件下架
             </button>
           `}
         </div>
@@ -235,7 +241,22 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
   if (proxyProductSelect) proxyProductSelect.innerHTML = selectHtml;
 });
 
-// 切換商品狀態 (active / out_of_stock / archived)
+// 單款式選項「快速開關缺貨」
+window.toggleSingleOptionStock = async (productId, optionIdx) => {
+  const prod = cachedProductsList.find(p => p.id === productId);
+  if (!prod || !prod.options || !prod.options[optionIdx]) return;
+
+  const newOptions = [...prod.options];
+  newOptions[optionIdx].isOutOfStock = !newOptions[optionIdx].isOutOfStock;
+
+  try {
+    await updateDoc(doc(db, "products", productId), { options: newOptions });
+  } catch (e) {
+    alert("更新缺貨狀態失敗：" + e.message);
+  }
+};
+
+// 切換整件商品狀態 (active / archived)
 window.changeProductStatus = async (productId, newStatus) => {
   try {
     await updateDoc(doc(db, "products", productId), { status: newStatus });
@@ -245,7 +266,7 @@ window.changeProductStatus = async (productId, newStatus) => {
   }
 };
 
-// 開啟商品編輯彈窗
+// 開啟商品編輯 Modal
 window.openEditProductModal = (productId) => {
   const prod = cachedProductsList.find(p => p.id === productId);
   if (!prod) return;
@@ -259,7 +280,7 @@ window.openEditProductModal = (productId) => {
   container.innerHTML = "";
 
   (prod.options || []).forEach(opt => {
-    window.addEditOptionRow(opt.name, opt.price);
+    window.addEditOptionRow(opt.name, opt.price, !!opt.isOutOfStock);
   });
 
   document.getElementById('edit-product-modal').classList.remove('hidden');
@@ -267,7 +288,7 @@ window.openEditProductModal = (productId) => {
 
 window.closeEditProductModal = () => document.getElementById('edit-product-modal').classList.add('hidden');
 
-// 送出商品編輯
+// 送出商品編輯 (儲存包含勾選的單項缺貨狀態)
 const editForm = document.getElementById('edit-product-form');
 if (editForm) {
   editForm.addEventListener('submit', async (e) => {
@@ -281,11 +302,14 @@ if (editForm) {
     document.querySelectorAll('.edit-option-row').forEach((row, idx) => {
       const nameInput = row.querySelector('.edit-opt-name');
       const priceInput = row.querySelector('.edit-opt-price');
+      const stockCheckbox = row.querySelector('.edit-opt-stock');
+
       if (nameInput && priceInput && nameInput.value.trim() !== "") {
         options.push({
           id: `opt_${idx + 1}`,
           name: nameInput.value.trim(),
-          price: Number(priceInput.value)
+          price: Number(priceInput.value),
+          isOutOfStock: stockCheckbox ? stockCheckbox.checked : false
         });
       }
     });
@@ -299,7 +323,7 @@ if (editForm) {
         imageUrl: imageUrl || "https://via.placeholder.com/300?text=No+Image",
         options
       });
-      alert("🎉 商品資料修改成功！");
+      alert("🎉 商品與缺貨狀態更新成功！");
       closeEditProductModal();
     } catch (err) {
       alert("修改失敗：" + err.message);

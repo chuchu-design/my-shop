@@ -295,7 +295,7 @@
       modal.classList.remove('hidden');
     };
 
-    // 商品列表渲染（自動排除「已下架」商品，若為「缺貨」則按鈕改為停用）
+    // 商品列表渲染 (精細判定單選項缺貨狀態)
     onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
@@ -306,7 +306,6 @@
       const groups = {};
       snapshot.forEach((doc) => {
         const item = { id: doc.id, ...doc.data() };
-        // 若商品設定為已下架，前台直接不呈現
         if (item.status === "archived") return;
 
         const title = item.storeTitle || "未分類團購";
@@ -326,17 +325,18 @@
         let productsHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
         groups[storeTitle].forEach(item => {
-          const isOutOfStock = item.status === "out_of_stock";
-
+          // 判定個別款式選項是否缺貨 (相容整件商品缺貨狀況)
           const optionsHtml = (item.options || []).map(opt => {
-            if (isOutOfStock) {
+            const isOptOutOfStock = opt.isOutOfStock || item.status === "out_of_stock";
+
+            if (isOptOutOfStock) {
               return `
                 <div class="flex justify-between items-center bg-gray-100 p-2.5 rounded-lg border text-sm opacity-60">
                   <span class="font-medium text-gray-500 line-through">${opt.name}</span>
                   <div class="flex items-center gap-2">
                     <span class="font-bold text-gray-400">NT$ ${opt.price}</span>
                     <button disabled class="bg-gray-400 text-white text-xs px-3 py-1.5 rounded-lg font-bold cursor-not-allowed">
-                      🚫 缺貨中
+                      🚫 售完
                     </button>
                   </div>
                 </div>
@@ -359,10 +359,9 @@
 
           productsHtml += `
             <div class="border rounded-xl p-4 flex flex-col justify-between space-y-3 bg-white hover:shadow-md transition relative">
-              ${isOutOfStock ? `<span class="absolute top-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded font-bold z-10 shadow">售完/缺貨中</span>` : ''}
               <div>
                 <div class="relative group cursor-pointer overflow-hidden rounded-lg mb-3" onclick="openImageModal('${item.imageUrl}')">
-                  <img src="${item.imageUrl}" class="w-full h-44 object-cover group-hover:scale-105 transition duration-200 ${isOutOfStock ? 'grayscale opacity-75' : ''}" alt="${item.productName}">
+                  <img src="${item.imageUrl}" class="w-full h-44 object-cover group-hover:scale-105 transition duration-200" alt="${item.productName}">
                   <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition">
                     🔍 點擊看全圖
                   </div>
