@@ -15,7 +15,7 @@ let cachedProductsList = [];
 let cachedOrdersList = [];
 let optionCount = 0;
 
-// 動態增加「新增商品」的款式選項列
+// 動態增加「新增商品」款式選項列
 export const addOptionRow = (defaultName = "", defaultPrice = "") => {
   optionCount++;
   const container = document.getElementById('options-container');
@@ -47,7 +47,7 @@ export const addOptionRow = (defaultName = "", defaultPrice = "") => {
 
 window.addOptionRow = addOptionRow;
 
-// 動態增加「編輯 Modal」內部的款式選項列 (包含單項缺貨勾選)
+// 動態增加「編輯 Modal」內部款式選項列
 window.addEditOptionRow = (defaultName = "", defaultPrice = "", isOutOfStock = false) => {
   const container = document.getElementById('edit-options-container');
   if (!container) return;
@@ -79,7 +79,6 @@ window.addEditOptionRow = (defaultName = "", defaultPrice = "", isOutOfStock = f
   container.appendChild(row);
 };
 
-// 頁面初始化
 document.addEventListener('DOMContentLoaded', () => {
   const addBtn = document.getElementById('add-option-btn');
   if (addBtn) addBtn.addEventListener('click', () => addOptionRow());
@@ -157,7 +156,7 @@ if (form) {
   });
 }
 
-// 2. 開團商品監聽與管理列表 (支援快捷開關單項缺貨)
+// 2. 開團商品監聽與管理列表
 const adminProductsContainer = document.getElementById('admin-products-list');
 onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
   cachedProductsList = [];
@@ -176,7 +175,6 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
     const prod = { id: docSnap.id, ...docSnap.data() };
     cachedProductsList.push(prod);
 
-    // 代下單選單 (只列出未下架且未缺貨的)
     if (prod.status !== "archived") {
       (prod.options || []).forEach((opt, idx) => {
         const stockLabel = opt.isOutOfStock ? " [缺貨中]" : "";
@@ -184,7 +182,6 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
       });
     }
 
-    // 款式選項與單獨缺貨按鈕列表
     const optionsBadges = (prod.options || []).map((o, idx) => {
       const isOut = !!o.isOutOfStock;
       return `
@@ -241,7 +238,6 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
   if (proxyProductSelect) proxyProductSelect.innerHTML = selectHtml;
 });
 
-// 單款式選項「快速開關缺貨」
 window.toggleSingleOptionStock = async (productId, optionIdx) => {
   const prod = cachedProductsList.find(p => p.id === productId);
   if (!prod || !prod.options || !prod.options[optionIdx]) return;
@@ -256,7 +252,6 @@ window.toggleSingleOptionStock = async (productId, optionIdx) => {
   }
 };
 
-// 切換整件商品狀態 (active / archived)
 window.changeProductStatus = async (productId, newStatus) => {
   try {
     await updateDoc(doc(db, "products", productId), { status: newStatus });
@@ -266,7 +261,6 @@ window.changeProductStatus = async (productId, newStatus) => {
   }
 };
 
-// 開啟商品編輯 Modal
 window.openEditProductModal = (productId) => {
   const prod = cachedProductsList.find(p => p.id === productId);
   if (!prod) return;
@@ -288,7 +282,6 @@ window.openEditProductModal = (productId) => {
 
 window.closeEditProductModal = () => document.getElementById('edit-product-modal').classList.add('hidden');
 
-// 送出商品編輯 (儲存包含勾選的單項缺貨狀態)
 const editForm = document.getElementById('edit-product-form');
 if (editForm) {
   editForm.addEventListener('submit', async (e) => {
@@ -362,6 +355,7 @@ if (proxyForm) {
         optionName: targetOption.name,
         price: targetOption.price,
         qty: qtyVal,
+        note: "團主手動代下單",
         status: "已下單",
         historyLogs: [{
           action: `團主手動新增/代下單：${targetProduct.productName} (${targetOption.name}) x${qtyVal}`,
@@ -435,7 +429,7 @@ window.editNickname = async (userId, oldNickname) => {
   }
 };
 
-// 5. 編輯訂單
+// 5. 編輯訂單 (支援修改備註)
 window.editOrderFull = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
@@ -452,10 +446,13 @@ window.editOrderFull = async (orderId) => {
   const newQty = prompt("修改【數量】：", targetOrder.qty || 1);
   if (newQty === null) return;
 
+  const newNote = prompt("修改【買家訂單備註】：", targetOrder.note || "");
+  if (newNote === null) return;
+
   const newStatus = prompt("修改【訂單狀態】(例如: 已下單 / 已付款 / 已取消)：", targetOrder.status || "已下單");
   if (newStatus === null) return;
 
-  const note = prompt("請輸入變更備註（將記在日誌中）：", "團主修改細項");
+  const noteLog = prompt("請輸入變更歷史說明（將記在日誌中）：", "團主修改細項");
 
   const currentUser = auth.currentUser;
 
@@ -465,9 +462,10 @@ window.editOrderFull = async (orderId) => {
       optionName: newOptionName.trim(),
       price: Number(newPrice),
       qty: Number(newQty),
+      note: newNote.trim(),
       status: newStatus.trim(),
       historyLogs: arrayUnion({
-        action: `編輯訂單: ${newProductName} (${newOptionName}) x${newQty}, 單價: $${newPrice}, 狀態: ${newStatus} (備註: ${note || '無'})`,
+        action: `編輯訂單: ${newProductName} (${newOptionName}) x${newQty}, 備註: ${newNote || '無'}, 狀態: ${newStatus} (說明: ${noteLog || '無'})`,
         operator: currentUser ? currentUser.email : "團主",
         timestamp: new Date().toLocaleString()
       })
@@ -562,7 +560,7 @@ window.executeMergeOrders = async () => {
   }
 };
 
-// 8. 訂單總覽監聽與渲染
+// 8. 訂單總覽監聽與渲染 (顯眼呈現象買家備註)
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
@@ -605,7 +603,7 @@ if (orderListContainer) {
             <div class="flex items-center gap-1.5">
               <span class='text-xs bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded'>${order.status || '已下單'}</span>
               <button onclick="editOrderFull('${order.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded border font-bold">
-                ✏️ 修改細項
+                ✏️ 修改細項/備註
               </button>
               <button onclick="cancelOrder('${order.id}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded border font-bold">
                 🚫 取消/刪除
@@ -618,7 +616,10 @@ if (orderListContainer) {
           <div class='text-sm text-gray-800'>
             <strong>商品：</strong>${order.productName || ''} - <span class="text-blue-600 font-bold">${order.optionName || ''}</span> x${order.qty || 1}
           </div>
-          <div class='text-sm text-gray-800 mt-0.5'>
+          
+          ${order.note ? `<div class='text-xs text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg mt-2 font-medium'>📝 買家訂單備註：${order.note}</div>` : ''}
+
+          <div class='text-sm text-gray-800 mt-1.5'>
             <strong>總金額：</strong>NT$ ${(order.price || 0) * (order.qty || 1)}
           </div>
 

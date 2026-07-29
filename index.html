@@ -61,7 +61,7 @@
     </button>
   </div>
 
-  <!-- 購物車 Modal -->
+  <!-- 購物車 Modal (新增訂單備註) -->
   <div id="cart-modal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden flex justify-end">
     <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto">
       <div>
@@ -76,6 +76,12 @@
       </div>
 
       <div class="border-t pt-4 space-y-3 bg-white">
+        <!-- 新增訂單備註輸入框 -->
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1">📝 訂單備註（選填，可填寫特定角色/規格/需求）：</label>
+          <input type="text" id="cart-order-note" placeholder="例如：柯南x1、基德x1 / 排配角優先" class="w-full border rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+
         <div class="flex justify-between text-lg font-bold">
           <span>總計金額：</span>
           <span id="cart-total-price" class="text-blue-600 font-extrabold">NT$ 0</span>
@@ -171,11 +177,13 @@
       if(totalEl) totalEl.innerText = `NT$ ${totalPrice}`;
     }
 
-    // 購物車結帳
+    // 購物車結帳 (連同備註寫入 Firebase)
     window.checkoutCart = async () => {
       const user = auth.currentUser;
       if (!user) return alert("請先完成 Google 登入才能送出購物車！");
       if (cart.length === 0) return alert("購物車是空的！");
+
+      const orderNote = (document.getElementById('cart-order-note')?.value || "").trim();
 
       let currentNickname = user.displayName || "團員";
       try {
@@ -195,9 +203,10 @@
               optionName: item.optionName,
               price: item.price,
               qty: item.qty,
+              note: orderNote, // 儲存買家填寫的備註
               status: "已下單",
               historyLogs: [{
-                action: "團員自主結帳 (購物車)",
+                action: `團員自主結帳 (購物車)${orderNote ? ' [備註: ' + orderNote + ']' : ''}`,
                 operator: `${currentNickname} (${user.email})`,
                 timestamp: new Date().toLocaleString()
               }],
@@ -206,8 +215,9 @@
           }
           cart = [];
           saveCart();
+          document.getElementById('cart-order-note').value = "";
           closeCartModal();
-          alert("🎉 訂單已成功送出！可以在下方「我的下單紀錄」查看。");
+          alert("🎉 訂單已成功送出！可在下方「我的下單紀錄」查看。");
         } catch (e) {
           alert("結帳失敗：" + e.message);
         }
@@ -295,7 +305,7 @@
       modal.classList.remove('hidden');
     };
 
-    // 商品列表渲染 (精細判定單選項缺貨狀態)
+    // 商品列表渲染
     onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
@@ -325,7 +335,6 @@
         let productsHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
         groups[storeTitle].forEach(item => {
-          // 判定個別款式選項是否缺貨 (相容整件商品缺貨狀況)
           const optionsHtml = (item.options || []).map(opt => {
             const isOptOutOfStock = opt.isOutOfStock || item.status === "out_of_stock";
 
@@ -389,7 +398,7 @@
       });
     });
 
-    // 個人歷史訂單列表
+    // 個人歷史訂單列表 (顯示備註)
     onAuthStateChanged(auth, (user) => {
       renderCart();
       if (!user) {
@@ -416,8 +425,10 @@
                   <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">${ord.storeTitle || '團購'}</span>
                   ${isTransferring ? `<span class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">🔑 轉單驗證碼：${ord.transferCode}</span>` : ''}
                 </div>
-                <span class="font-bold text-gray-800">${ord.productName}</span>
-                <span class="text-gray-600"> (${ord.optionName}) x${ord.qty || 1}</span>
+                <div class="font-bold text-gray-800">
+                  ${ord.productName} (${ord.optionName}) x${ord.qty || 1}
+                </div>
+                ${ord.note ? `<div class="text-xs text-amber-800 bg-amber-50 px-2 py-0.5 rounded inline-block mt-1 font-medium">📝 買家備註：${ord.note}</div>` : ''}
               </div>
               
               <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
