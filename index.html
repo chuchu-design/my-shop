@@ -6,31 +6,41 @@
   <title>團購賣場</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800 pb-24">
+<body class="bg-gray-50 min-h-screen text-gray-800 pb-32">
 
-  <!-- 頁首導覽列 -->
-  <nav class="bg-white border-b shadow-sm p-4 sticky top-0 z-10">
-    <div class="max-w-4xl mx-auto flex justify-between items-center">
+  <!-- 頂部導覽列 -->
+  <nav class="bg-white border-b shadow-sm p-4 sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto flex justify-between items-center gap-2">
       <h1 class="text-xl font-bold text-blue-600">🛒 團購賣場</h1>
-      <div id="user-info" class="flex items-center gap-3">
-        <span class="text-xs text-gray-400">載入中...</span>
+      
+      <div class="flex items-center gap-3">
+        <!-- 頂部購物車快捷按鈕 -->
+        <button onclick="openCartModal()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow flex items-center gap-1">
+          🛒 購物車 (<span id="cart-nav-count">0</span>)
+        </button>
+        <div id="user-info" class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">載入中...</span>
+        </div>
       </div>
     </div>
   </nav>
 
-  <!-- 主要內容區 -->
+  <!-- 主要內容 -->
   <main class="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
     <div class="flex justify-between items-center border-b pb-4">
       <h2 class="text-2xl font-bold text-gray-800">進行中的團購</h2>
-      <a href="admin.html" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded">團主後台</a>
+      <!-- 後台入口預設隱藏，只有團主登入才會顯示 -->
+      <a id="admin-link" href="admin.html" class="hidden text-xs bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-1.5 rounded-lg transition shadow">
+        ⚙️ 進入團主後台
+      </a>
     </div>
 
-    <!-- 商品依團購分類區 -->
+    <!-- 商品開團分類區 -->
     <div id="products-container" class="space-y-8">
       <p class="text-gray-500">商品載入中...</p>
     </div>
 
-    <!-- 團員個人歷史訂單區 -->
+    <!-- 個人歷史訂單區 -->
     <div class="mt-12 pt-8 border-t border-gray-200">
       <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
         📜 我的下單紀錄
@@ -41,18 +51,20 @@
     </div>
   </main>
 
-  <!-- 右下角懸浮購物車按鈕 -->
-  <button id="cart-floating-btn" onclick="openCartModal()" class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 z-40 transition transform active:scale-95">
-    <span class="text-lg">🛒 購物車</span>
-    <span id="cart-badge" class="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">0</span>
-  </button>
+  <!-- 右下角懸浮大購物車按鈕 -->
+  <div class="fixed bottom-6 right-6 z-40">
+    <button onclick="openCartModal()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 transition transform active:scale-95 border-2 border-white">
+      <span class="text-lg">🛒 開啟購物車</span>
+      <span id="cart-floating-badge" class="bg-red-500 text-white text-xs font-black rounded-full px-2 py-0.5 shadow">0</span>
+    </button>
+  </div>
 
-  <!-- 購物車抽屜 Modal -->
-  <div id="cart-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex justify-end">
+  <!-- 購物車 Modal -->
+  <div id="cart-modal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 hidden flex justify-end">
     <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between p-6 overflow-y-auto">
       <div>
         <div class="flex justify-between items-center border-b pb-3 mb-4">
-          <h3 class="text-xl font-bold text-gray-800">🛍️ 購物車清單</h3>
+          <h3 class="text-xl font-bold text-gray-800">🛍️ 我的購物車清單</h3>
           <button onclick="closeCartModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
         </div>
 
@@ -64,20 +76,20 @@
       <div class="border-t pt-4 space-y-3 bg-white">
         <div class="flex justify-between text-lg font-bold">
           <span>總計金額：</span>
-          <span id="cart-total-price" class="text-blue-600">NT$ 0</span>
+          <span id="cart-total-price" class="text-blue-600 font-extrabold">NT$ 0</span>
         </div>
-        <button onclick="checkoutCart()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition">
-          一鍵送出訂單
+        <button onclick="checkoutCart()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition text-base">
+          確認送出訂單
         </button>
       </div>
     </div>
   </div>
 
   <!-- 圖片大圖 Modal -->
-  <div id="image-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div id="image-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
     <div class="relative max-w-4xl w-full flex justify-center items-center">
-      <button id="close-modal-btn" class="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300">&times;</button>
-      <img id="modal-img" src="" class="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl">
+      <button id="close-modal-btn" class="absolute -top-10 right-0 text-white text-3xl font-bold">&times;</button>
+      <img id="modal-img" src="" class="max-h-[85vh] max-w-full object-contain rounded-lg">
     </div>
   </div>
 
@@ -86,13 +98,14 @@
     import { collection, onSnapshot, query, orderBy, where, addDoc, serverTimestamp, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+    const ADMIN_EMAIL = "chuchu20011225@gmail.com";
     const container = document.getElementById('products-container');
     const myOrdersContainer = document.getElementById('my-orders-container');
+    const adminLink = document.getElementById('admin-link');
     const modal = document.getElementById('image-modal');
     const modalImg = document.getElementById('modal-img');
-    const closeModalBtn = document.getElementById('close-modal-btn');
 
-    // 購物車本地暫存
+    // 購物車資料庫
     let cart = JSON.parse(localStorage.getItem('user_cart') || '[]');
 
     function saveCart() {
@@ -103,16 +116,15 @@
     window.openCartModal = () => document.getElementById('cart-modal').classList.remove('hidden');
     window.closeCartModal = () => document.getElementById('cart-modal').classList.add('hidden');
 
-    // 純加入購物車（不安裝直接下單）
     window.addToCart = (storeTitle, productName, optionName, price) => {
-      const existingIndex = cart.findIndex(i => i.storeTitle === storeTitle && i.productName === productName && i.optionName === optionName);
-      if (existingIndex > -1) {
-        cart[existingIndex].qty += 1;
+      const idx = cart.findIndex(i => i.storeTitle === storeTitle && i.productName === productName && i.optionName === optionName);
+      if (idx > -1) {
+        cart[idx].qty += 1;
       } else {
         cart.push({ storeTitle, productName, optionName, price, qty: 1 });
       }
       saveCart();
-      alert(`已將【${productName} - ${optionName}】放入購物車！`);
+      alert(`✅ 已加入購物車：【${productName} - ${optionName}】`);
     };
 
     window.updateCartQty = (index, delta) => {
@@ -123,7 +135,8 @@
 
     function renderCart() {
       const container = document.getElementById('cart-items-container');
-      const badge = document.getElementById('cart-badge');
+      const navCount = document.getElementById('cart-nav-count');
+      const floatBadge = document.getElementById('cart-floating-badge');
       const totalEl = document.getElementById('cart-total-price');
 
       let totalCount = 0;
@@ -137,16 +150,16 @@
           totalCount += item.qty;
           totalPrice += item.price * item.qty;
           html += `
-            <div class="p-3 border rounded-lg bg-gray-50 flex justify-between items-center">
+            <div class="p-3 border rounded-xl bg-gray-50 flex justify-between items-center shadow-sm">
               <div>
-                <div class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded inline-block mb-1">${item.storeTitle}</div>
-                <div class="font-bold text-gray-800 text-sm">${item.productName}</div>
-                <div class="text-xs text-gray-500">${item.optionName} - NT$ ${item.price}</div>
+                <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded mr-1">${item.storeTitle}</span>
+                <div class="font-bold text-gray-800 text-sm mt-1">${item.productName}</div>
+                <div class="text-xs text-gray-500">${item.optionName} (NT$ ${item.price})</div>
               </div>
               <div class="flex items-center gap-2">
-                <button onclick="updateCartQty(${index}, -1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded font-bold text-xs">-</button>
+                <button onclick="updateCartQty(${index}, -1)" class="w-7 h-7 bg-white border border-gray-300 rounded-lg font-bold text-sm hover:bg-gray-100">-</button>
                 <span class="font-bold text-sm w-4 text-center">${item.qty}</span>
-                <button onclick="updateCartQty(${index}, 1)" class="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded font-bold text-xs">+</button>
+                <button onclick="updateCartQty(${index}, 1)" class="w-7 h-7 bg-white border border-gray-300 rounded-lg font-bold text-sm hover:bg-gray-100">+</button>
               </div>
             </div>
           `;
@@ -154,11 +167,12 @@
         container.innerHTML = html;
       }
 
-      badge.innerText = totalCount;
-      totalEl.innerText = `NT$ ${totalPrice}`;
+      if(navCount) navCount.innerText = totalCount;
+      if(floatBadge) floatBadge.innerText = totalCount;
+      if(totalEl) totalEl.innerText = `NT$ ${totalPrice}`;
     }
 
-    // 購物車統一結帳
+    // 送出購物車
     window.checkoutCart = async () => {
       const user = auth.currentUser;
       if (!user) {
@@ -170,11 +184,10 @@
         return;
       }
 
-      // 取得資料庫註冊暱稱
       let currentNickname = user.displayName || "團員";
       try {
         const uSnap = await getDoc(doc(db, "users", user.uid));
-        if (uSnap.exists() && uSnap.data().nickname) {
+        if (uSnap.exists() && uSnap.data()?.nickname) {
           currentNickname = uSnap.data().nickname;
         }
       } catch(e) {}
@@ -193,7 +206,7 @@
               qty: item.qty,
               status: "已下單",
               historyLogs: [{
-                action: "團員自主下單 (購物車)",
+                action: "團員自主結帳 (購物車)",
                 operator: `${currentNickname} (${user.email})`,
                 timestamp: new Date().toLocaleString()
               }],
@@ -203,26 +216,21 @@
           cart = [];
           saveCart();
           closeCartModal();
-          alert("🎉 購物車訂單已成功送出！");
+          alert("🎉 訂單已成功送出！可在下方「我的下單紀錄」查看。");
         } catch (e) {
-          console.error("結帳失敗", e);
           alert("結帳失敗：" + e.message);
         }
       }
     };
 
-    // 關閉大圖
-    closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
-    modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
-
+    document.getElementById('close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
     window.openImageModal = (src) => {
       modalImg.src = src;
       modal.classList.remove('hidden');
     };
 
-    // 1. 讀取商品並分類
-    const qProducts = query(collection(db, "products"), orderBy("createdAt", "desc"));
-    onSnapshot(qProducts, (snapshot) => {
+    // 商品與分類
+    onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
         container.innerHTML = "<p class='text-gray-500'>目前沒有進行中的團購商品。</p>";
@@ -250,8 +258,8 @@
               <div class="flex items-center gap-2">
                 <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
                 <button onclick="addToCart('${storeTitle}', '${item.productName}', '${opt.name}', ${opt.price})" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-medium">
-                  + 加入購物車
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-bold">
+                  + 購物車
                 </button>
               </div>
             </div>
@@ -263,7 +271,7 @@
                 <div class="relative group cursor-pointer overflow-hidden rounded-lg mb-3" onclick="openImageModal('${item.imageUrl}')">
                   <img src="${item.imageUrl}" class="w-full h-44 object-cover group-hover:scale-105 transition duration-200" alt="${item.productName}">
                   <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition">
-                    🔍 點擊查看大圖
+                    🔍 點擊看全圖
                   </div>
                 </div>
                 <h4 class="font-bold text-gray-900 text-base">${item.productName}</h4>
@@ -289,16 +297,22 @@
       });
     });
 
-    // 團員個人訂單即時監聽
     onAuthStateChanged(auth, (user) => {
       renderCart();
+
+      // 檢查是否為團主，控制後台按鈕顯示
+      if (user && user.email === ADMIN_EMAIL) {
+        if (adminLink) adminLink.classList.remove('hidden');
+      } else {
+        if (adminLink) adminLink.classList.add('hidden');
+      }
+
       if (!user) {
         myOrdersContainer.innerHTML = "<p class='text-gray-400 text-sm'>請先登入以檢視您的訂單紀錄。</p>";
         return;
       }
 
-      const qMyOrders = query(collection(db, "orders"), where("userId", "==", user.uid));
-      onSnapshot(qMyOrders, (snapshot) => {
+      onSnapshot(query(collection(db, "orders"), where("userId", "==", user.uid)), (snapshot) => {
         if (snapshot.empty) {
           myOrdersContainer.innerHTML = "<p class='text-gray-500 text-sm'>您目前尚無下單紀錄。</p>";
           return;

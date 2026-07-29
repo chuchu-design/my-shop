@@ -8,6 +8,15 @@
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 pb-16">
 
+  <!-- 權限未通過時顯示的保護遮罩 -->
+  <div id="auth-guard" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center text-white">
+    <div class="text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div class="text-xl font-bold">團主後台權限驗證中...</div>
+      <p class="text-sm text-gray-400">若長時間未回應或非團主帳號，系統將自動跳轉回前台。</p>
+    </div>
+  </div>
+
   <!-- 頂部列 -->
   <nav class="bg-slate-800 text-white p-4 shadow-md">
     <div class="max-w-5xl mx-auto flex justify-between items-center">
@@ -72,7 +81,7 @@
       </form>
     </div>
 
-    <!-- 頁籤 2: 團主幫團員代下單 (需求 2) -->
+    <!-- 頁籤 2: 團主幫團員代下單 -->
     <div id="section-proxy" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🙋 團主協助團員下單</h2>
       <form id="proxy-order-form" class="space-y-4 max-w-xl">
@@ -107,7 +116,7 @@
       </div>
     </div>
 
-    <!-- 頁籤 4: 訂單管理與歷史記錄 (需求 2, 3) -->
+    <!-- 頁籤 4: 訂單管理與歷史記錄 -->
     <div id="section-orders" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">📦 訂單總覽與紀錄</h2>
       <div id="order-list-container">
@@ -118,7 +127,25 @@
 
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./products.js"></script>
-  <script>
+  <script type="module">
+    import { auth } from "./auth.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    const ADMIN_EMAIL = "chuchu20011225@gmail.com";
+    const authGuard = document.getElementById('auth-guard');
+
+    // 嚴格檢查是否為團主登入
+    onAuthStateChanged(auth, (user) => {
+      if (!user || user.email !== ADMIN_EMAIL) {
+        alert("⚠️ 存取被拒！您沒有檢視團主後台的權限。");
+        window.location.href = "index.html";
+      } else {
+        // 驗證通過，解開保護遮罩
+        if (authGuard) authGuard.style.display = "none";
+      }
+    });
+
+    // 頁籤控制
     const tabs = [
       { btn: 'tab-add-btn', sec: 'section-add-product' },
       { btn: 'tab-proxy-btn', sec: 'section-proxy' },
