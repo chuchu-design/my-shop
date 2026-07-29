@@ -2,9 +2,9 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// ⚠️ 請替換為你的 Firebase 專案配置資訊 ⚠️
+// 請確保這裡填入的是你真正的 Firebase 專案設定資訊！
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "YOUR_ACTUAL_API_KEY",
   authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
   projectId: "YOUR_PROJECT_ID",
   storageBucket: "YOUR_PROJECT_ID.appspot.com",
@@ -12,20 +12,18 @@ const firebaseConfig = {
   appId: "YOUR_APP_ID"
 };
 
-// 防重複初始化
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 const provider = new GoogleAuthProvider();
 
-// 全局監聽登入狀態
+// 監聽登入狀態
 onAuthStateChanged(auth, async (user) => {
   const userInfoDiv = document.getElementById('user-info');
   if (!userInfoDiv) return;
 
   if (user) {
-    // 檢查是否有暱稱
     const userDocRef = doc(db, "users", user.uid);
     const userDocSnap = await getDoc(userDocRef);
 

@@ -1,13 +1,9 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { db, auth } from "./auth.js";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 請確保 auth.js 或這裡已初始化，若沒顯示資料請確認你的 firebaseConfig 設置
-const db = getFirestore();
-const auth = getAuth();
 const ADMIN_EMAIL = "chuchu20011225@gmail.com";
 
-// 轉 Base64 輔助函式
+// Base64 轉換
 const fileToBase64 = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.readAsDataURL(file);
@@ -15,7 +11,7 @@ const fileToBase64 = (file) => new Promise((resolve, reject) => {
   reader.onerror = (error) => reject(error);
 });
 
-// 1. 商品上架 logic
+// 1. 商品上架邏輯
 const form = document.getElementById('add-product-form');
 if (form) {
   form.addEventListener('submit', async (e) => {
@@ -75,11 +71,11 @@ if (memberListContainer) {
       memberListContainer.innerHTML = "<p class='text-gray-500'>目前無任何註冊團員。</p>";
       return;
     }
-    let html = `<div class='divide-y border rounded-lg overflow-hidden'>`;
+    let html = `<div class='divide-y border rounded-lg overflow-hidden bg-white'>`;
     snapshot.forEach((doc) => {
       const user = doc.data();
       html += `
-        <div class='p-3 bg-white flex justify-between items-center hover:bg-gray-50'>
+        <div class='p-3 flex justify-between items-center hover:bg-gray-50'>
           <div>
             <div class='font-bold text-gray-800'>${user.nickname || '未設定暱稱'}</div>
             <div class='text-xs text-gray-500'>${user.email || ''}</div>
@@ -91,7 +87,7 @@ if (memberListContainer) {
     html += `</div>`;
     memberListContainer.innerHTML = html;
   }, (err) => {
-    memberListContainer.innerHTML = `<p class='text-red-500'>載入失敗：${err.message}</p>`;
+    memberListContainer.innerHTML = `<p class='text-red-500'>載入團員失敗：${err.message}</p>`;
   });
 }
 
