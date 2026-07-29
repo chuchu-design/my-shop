@@ -1,26 +1,26 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 請至 Firebase Console -> 專案設定 -> 一般 -> 你的應用程式 中複製貼上專案設定：
-// (如果你記得之前的 apiKey，請將下方括號處換成你原本的真實字串)
+// 帶入真實 Firebase 憑證
 const firebaseConfig = {
-  apiKey: "AIzaSy...", // 👈 請將此處替換為你真實的 Firebase API Key
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCzTKsFrttWiWECWsHRvDTJ9N_XPH0bWEM",
+  authDomain: "my-shop-new-efdb0.firebaseapp.com",
+  projectId: "my-shop-new-efdb0",
+  storageBucket: "my-shop-new-efdb0.firebasestorage.app",
+  messagingSenderId: "986465274332",
+  appId: "1:986465274332:web:8a3a258549602f40c36719",
+  measurementId: "G-0DYCN7TFL9"
 };
 
-// 初始化 App 與服務
+// 初始化 Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 const provider = new GoogleAuthProvider();
 
-// 1. 登入 / 登出與暱稱綁定邏輯
+// 登入狀態監聽與團員暱稱綁定
 onAuthStateChanged(auth, async (user) => {
   const userInfoDiv = document.getElementById('user-info');
   if (!userInfoDiv) return;
@@ -53,7 +53,7 @@ onAuthStateChanged(auth, async (user) => {
 
       document.getElementById('logout-btn')?.addEventListener('click', () => signOut(auth));
     } catch (e) {
-      console.error("讀取或寫入使用者資料失敗：", e);
+      console.error("使用者資料讀取失敗：", e);
     }
   } else {
     userInfoDiv.innerHTML = `
