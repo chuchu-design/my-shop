@@ -3,7 +3,7 @@ import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 
 
 const ADMIN_EMAIL = "chuchu20011225@gmail.com";
 
-// Base64 轉換
+// Base64 圖片轉碼
 const fileToBase64 = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.readAsDataURL(file);
@@ -63,35 +63,36 @@ if (form) {
   });
 }
 
-// 2. 即時載入團員資料
+// 2. 即時連動團員名單 (Firestore 'users' 集合)
 const memberListContainer = document.getElementById('member-list-container');
 if (memberListContainer) {
   onSnapshot(collection(db, "users"), (snapshot) => {
     if (snapshot.empty) {
-      memberListContainer.innerHTML = "<p class='text-gray-500'>目前無任何註冊團員。</p>";
+      memberListContainer.innerHTML = "<p class='text-gray-500'>目前資料庫中尚無團員資料。</p>";
       return;
     }
-    let html = `<div class='divide-y border rounded-lg overflow-hidden bg-white'>`;
+    let html = `<div class='divide-y border rounded-lg overflow-hidden bg-white shadow-sm'>`;
     snapshot.forEach((doc) => {
       const user = doc.data();
       html += `
         <div class='p-3 flex justify-between items-center hover:bg-gray-50'>
           <div>
             <div class='font-bold text-gray-800'>${user.nickname || '未設定暱稱'}</div>
-            <div class='text-xs text-gray-500'>${user.email || ''}</div>
+            <div class='text-xs text-gray-500'>${user.email || '無 Email'}</div>
           </div>
-          <span class='text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded'>UID: ${doc.id.substring(0,6)}...</span>
+          <span class='text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-mono'>UID: ${doc.id.substring(0,6)}...</span>
         </div>
       `;
     });
     html += `</div>`;
     memberListContainer.innerHTML = html;
   }, (err) => {
-    memberListContainer.innerHTML = `<p class='text-red-500'>載入團員失敗：${err.message}</p>`;
+    console.error("讀取團員失敗：", err);
+    memberListContainer.innerHTML = `<p class='text-red-500 p-2'>載入團員失敗 (${err.message})，請檢查 Firestore 安全規則或 key 是否正確。</p>`;
   });
 }
 
-// 3. 即時載入訂單資料
+// 3. 即時連動訂單紀錄 (Firestore 'orders' 集合)
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
