@@ -3,90 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>賣家後台</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: auto; }
-    nav { margin-bottom: 20px; background: #f0f0f0; padding: 10px; border-radius: 6px; }
-    nav a { margin-right: 15px; font-weight: bold; text-decoration: none; color: #0076ff; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    .clear-btn { background: #d9534f; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; float: right; }
-  </style>
+  <title>團主後台 - 代購網站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100 flex flex-col md:flex-row min-h-screen">
 
-  <nav>
-    <a href="index.html">🛒 購物下單</a> | 
-    <a href="search.html">🔍 團員查單與轉單</a> | 
-    <a href="admin.html">⚙️ 賣家後台</a>
-  </nav>
+  <!-- 電腦端側邊欄 -->
+  <aside class="hidden md:flex flex-col w-64 bg-slate-800 text-white min-h-screen p-4">
+    <h1 class="text-xl font-bold mb-6 text-amber-400">👑 團主後台</h1>
+    <nav class="flex flex-col space-y-2">
+      <a href="admin.html" class="p-3 rounded-lg bg-slate-700 text-amber-400 font-bold">📊 統計總覽</a>
+      <a href="index.html" class="p-3 rounded-lg hover:bg-slate-700">🛒 返回賣場</a>
+    </nav>
+  </aside>
 
-  <h1>⚙️ 賣家後台 - 所有訂單總覽</h1>
-  <button class="clear-btn" onclick="clearAllOrders()">清空所有測試訂單</button>
+  <!-- 主要內容區 -->
+  <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0">
+    <h2 class="text-2xl font-bold mb-6">團主數據中心</h2>
 
-  <div id="admin-orders-table"></div>
+    <!-- 數據卡片區 (手機 1 欄，電腦 2 欄) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <!-- 卡片 1：代購總數量 -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border">
+        <h3 class="text-gray-500 font-medium mb-2">📦 開團商品總下單數</h3>
+        <p class="text-3xl font-bold text-indigo-600" id="total-products-count">0 件</p>
+      </div>
 
-  <script src="products.js"></script>
-  <script>
-    function renderAdminOrders() {
-      const orders = getOrders();
-      const container = document.getElementById('admin-orders-table');
+      <!-- 卡片 2：團員數 -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border">
+        <h3 class="text-gray-500 font-medium mb-2">👥 總跟團人數</h3>
+        <p class="text-3xl font-bold text-emerald-600" id="total-members-count">0 人</p>
+      </div>
+    </div>
 
-      if (orders.length === 0) {
-        container.innerHTML = "<p>目前沒有任何訂單紀錄。</p>";
-        return;
-      }
-
-      let totalSales = 0;
-      let html = `
-        <table>
+    <!-- 團員訂單明細表 -->
+    <div class="bg-white rounded-xl shadow-sm border p-4">
+      <h3 class="text-lg font-bold mb-4">團員訂單總量</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
           <thead>
-            <tr>
-              <th>訂單編號</th>
-              <th>團員姓名</th>
-              <th>手機號碼</th>
-              <th>訂購內容</th>
-              <th>金額</th>
-              <th>目前驗證碼</th>
-              <th>下單時間</th>
+            <tr class="border-b text-gray-500 text-sm">
+              <th class="p-2">團員姓名</th>
+              <th class="p-2">訂單總數</th>
+              <th class="p-2">下單總金額</th>
             </tr>
           </thead>
-          <tbody>
-      `;
-
-      orders.forEach(o => {
-        totalSales += o.total;
-        html += `
-          <tr>
-            <td><strong>${o.id}</strong></td>
-            <td>${o.memberName}</td>
-            <td>${o.memberPhone}</td>
-            <td>${o.items.map(i => `${i.name} x${i.qty}`).join('<br>')}</td>
-            <td>NT$ ${o.total}</td>
-            <td><code>${o.verifyCode}</code></td>
-            <td>${o.createdAt}</td>
-          </tr>
-        `;
-      });
-
-      html += `
+          <tbody id="admin-member-list">
+            <tr>
+              <td colspan="3" class="p-4 text-center text-gray-400">尚無資料</td>
+            </tr>
           </tbody>
         </table>
-        <h3>賣場總銷售額：NT$ ${totalSales}</h3>
-      `;
+      </div>
+    </div>
+  </main>
 
-      container.innerHTML = html;
-    }
+  <!-- 手機端底部捷徑 -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-800 text-white flex justify-around p-2 text-xs text-center">
+    <a href="index.html" class="flex-1 py-1">🛒<br>賣場</a>
+    <a href="admin.html" class="flex-1 py-1 text-amber-400 font-bold">👑<br>後台</a>
+  </nav>
 
-    function clearAllOrders() {
-      if (confirm("確定要清空所有訂單嗎？")) {
-        localStorage.removeItem('orders');
-        renderAdminOrders();
-      }
-    }
-
-    renderAdminOrders();
-  </script>
 </body>
 </html>

@@ -2,95 +2,58 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <!-- 手機適配必備設定 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>團購賣場</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-    nav { margin-bottom: 20px; background: #f0f0f0; padding: 10px; border-radius: 6px; }
-    nav a { margin-right: 15px; font-weight: bold; text-decoration: none; color: #0076ff; }
-    .product-card { border: 1px solid #ccc; padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-    .cart-box { background: #fdf8f0; border: 2px dashed #ffa726; padding: 15px; border-radius: 8px; margin-top: 30px; }
-    button { background: #0076ff; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
-    input { padding: 8px; width: 80%; margin-bottom: 8px; }
-  </style>
+  <title>團員首頁 - 代購網站</title>
+  <!-- 載入 Tailwind CSS (不用下載，自動適配電腦與手機樣式) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 載入 Google 登入 SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body>
+<body class="bg-gray-50 flex flex-col md:flex-row min-h-screen">
 
-  <nav>
-    <a href="index.html">🛒 購物下單</a> | 
-    <a href="search.html">🔍 團員查單與轉單</a> | 
-    <a href="admin.html">⚙️ 賣家後台</a>
+  <!-- 1. 電腦端側邊欄 (Sidebar) -->
+  <aside class="hidden md:flex flex-col w-64 bg-white border-r min-h-screen p-4">
+    <h1 class="text-xl font-bold mb-6 text-indigo-600">🛍️ 代購小幫手</h1>
+    <nav class="flex flex-col space-y-2">
+      <a href="index.html" class="p-3 rounded-lg bg-indigo-50 text-indigo-600 font-bold">🛒 商品大廳</a>
+      <a href="search.html" class="p-3 rounded-lg text-gray-600 hover:bg-gray-100">🔍 搜尋商品</a>
+      <a href="admin.html" class="p-3 rounded-lg text-gray-600 hover:bg-gray-100">👑 團主管理後台</a>
+    </nav>
+    <div class="mt-auto pt-4 border-t">
+      <!-- 登入狀態區塊 -->
+      <div id="user-info-desktop" class="text-sm text-gray-500 mb-2">未登入</div>
+      <button id="login-btn-desktop" onclick="handleGoogleLogin()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">
+        Google 登入
+      </button>
+    </div>
+  </aside>
+
+  <!-- 2. 手機端頂部欄 -->
+  <header class="md:hidden bg-white border-b p-4 flex justify-between items-center">
+    <h1 class="text-lg font-bold text-indigo-600">🛍️ 代購小幫手</h1>
+    <button id="login-btn-mobile" onclick="handleGoogleLogin()" class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg">
+      登入
+    </button>
+  </header>
+
+  <!-- 3. 主要內容區域 -->
+  <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0">
+    <h2 class="text-2xl font-bold mb-4">最新商品</h2>
+    <!-- 商品展示區（範例卡片） -->
+    <div id="product-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <p class="text-gray-400">商品載入中...</p>
+    </div>
+  </main>
+
+  <!-- 4. 手機端底部捷徑欄 (Bottom Navigation) -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 text-xs text-center">
+    <a href="index.html" class="flex-1 py-1 text-indigo-600 font-bold">🛒<br>首頁</a>
+    <a href="search.html" class="flex-1 py-1 text-gray-600">🔍<br>搜尋</a>
+    <a href="admin.html" class="flex-1 py-1 text-gray-600">👑<br>團主</a>
   </nav>
 
-  <h1>🛒 團購商品列表</h1>
-  <div id="product-list"></div>
-
-  <div class="cart-box">
-    <h2>🛍️ 我的購物車</h2>
-    <div id="cart-items">無商品</div>
-    <p><strong>總金額：NT$ <span id="cart-total">0</span></strong></p>
-
-    <hr>
-    <h3>下單資料</h3>
-    <p><input type="text" id="buyer-name" placeholder="請輸入姓名 / 暱稱"></p>
-    <p><input type="text" id="buyer-phone" placeholder="請輸入手機號碼"></p>
-    <button onclick="handleCheckout()">送出訂單</button>
-  </div>
-
+  <!-- 5. 引入邏輯檔 -->
   <script src="products.js"></script>
-  <script>
-    function renderProducts() {
-      const container = document.getElementById('product-list');
-      container.innerHTML = products.map(p => `
-        <div class="product-card">
-          <div>
-            <h3>${p.name}</h3>
-            <p>價格：NT$ ${p.price}</p>
-          </div>
-          <button onclick="addToCart(${p.id})">加入購物車</button>
-        </div>
-      `).join('');
-    }
-
-    function renderCart() {
-      const cart = getCart();
-      const container = document.getElementById('cart-items');
-      const totalEl = document.getElementById('cart-total');
-
-      if (cart.length === 0) {
-        container.innerHTML = "<p>購物車目前是空的</p>";
-        totalEl.innerText = "0";
-        return;
-      }
-
-      container.innerHTML = cart.map(item => `
-        <p>${item.name} x ${item.qty} = NT$ ${item.price * item.qty}</p>
-      `).join('');
-
-      const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-      totalEl.innerText = total;
-    }
-
-    function handleCheckout() {
-      const name = document.getElementById('buyer-name').value.trim();
-      const phone = document.getElementById('buyer-phone').value.trim();
-
-      if (!name || !phone) {
-        alert("請完整填寫姓名與手機號碼！");
-        return;
-      }
-
-      const order = submitOrder(name, phone);
-      if (order) {
-        alert(`🎉 下單成功！\n訂單編號：${order.id}\n轉單驗證碼：${order.verifyCode}\n（若日後要轉單給別人，請給他此驗證碼）`);
-        document.getElementById('buyer-name').value = '';
-        document.getElementById('buyer-phone').value = '';
-        renderCart();
-      }
-    }
-
-    renderProducts();
-    renderCart();
-  </script>
 </body>
 </html>
