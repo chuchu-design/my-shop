@@ -1,7 +1,18 @@
 import { db, auth } from "./auth.js";
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const ADMIN_EMAIL = "chuchu20011225@gmail.com";
+
+// 1. 後台權限防護：非團主一律開啟阻擋彈窗 (需求 1)
+onAuthStateChanged(auth, (user) => {
+  const overlay = document.getElementById('unauthorized-overlay');
+  if (!user || user.email !== ADMIN_EMAIL) {
+    if (overlay) overlay.classList.remove('hidden');
+  } else {
+    if (overlay) overlay.classList.add('hidden');
+  }
+});
 
 const fileToBase64 = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -15,7 +26,7 @@ let cachedProductsList = [];
 let cachedOrdersList = [];
 let optionCount = 0;
 
-// 動態增加「新增商品」款式選項列
+// 款式選項動態新增/編輯
 export const addOptionRow = (defaultName = "", defaultPrice = "") => {
   optionCount++;
   const container = document.getElementById('options-container');
@@ -35,10 +46,7 @@ export const addOptionRow = (defaultName = "", defaultPrice = "") => {
   `;
 
   row.querySelector('.delete-opt-btn').addEventListener('click', () => {
-    if (container.querySelectorAll('.option-row').length <= 1) {
-      alert("商品至少需要保留一個款式選項！");
-      return;
-    }
+    if (container.querySelectorAll('.option-row').length <= 1) return alert("商品至少需要保留一個款式選項！");
     row.remove();
   });
 
@@ -47,7 +55,6 @@ export const addOptionRow = (defaultName = "", defaultPrice = "") => {
 
 window.addOptionRow = addOptionRow;
 
-// 動態增加「編輯 Modal」內部款式選項列
 window.addEditOptionRow = (defaultName = "", defaultPrice = "", isOutOfStock = false) => {
   const container = document.getElementById('edit-options-container');
   if (!container) return;
@@ -69,10 +76,7 @@ window.addEditOptionRow = (defaultName = "", defaultPrice = "", isOutOfStock = f
   `;
 
   row.querySelector('.delete-edit-opt-btn').addEventListener('click', () => {
-    if (container.querySelectorAll('.edit-option-row').length <= 1) {
-      alert("商品至少需要保留一個款式選項！");
-      return;
-    }
+    if (container.querySelectorAll('.edit-option-row').length <= 1) return alert("商品至少需要保留一個款式選項！");
     row.remove();
   });
 
@@ -90,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// 1. 上架商品
+// 2. 上架商品
 const form = document.getElementById('add-product-form');
 if (form) {
   form.addEventListener('submit', async (e) => {
@@ -100,7 +104,6 @@ if (form) {
 
     const submitBtn = document.getElementById('submit-btn');
     submitBtn.disabled = true;
-    submitBtn.innerText = "商品上架處理中...";
 
     try {
       const storeTitle = document.getElementById('store-title').value.trim();
@@ -108,9 +111,7 @@ if (form) {
       let imageUrl = document.getElementById('product-img-url').value.trim();
       const fileInput = document.getElementById('product-img-file');
       
-      if (fileInput && fileInput.files.length > 0) {
-        imageUrl = await fileToBase64(fileInput.files[0]);
-      }
+      if (fileInput && fileInput.files.length > 0) imageUrl = await fileToBase64(fileInput.files[0]);
 
       const options = [];
       document.querySelectorAll('.option-row').forEach((row, idx) => {
@@ -126,11 +127,7 @@ if (form) {
         }
       });
 
-      if (options.length === 0) {
-        alert("請至少填寫一個有效的商品規格！");
-        submitBtn.disabled = false;
-        return;
-      }
+      if (options.length === 0) return alert("請至少填寫一個有效的商品規格！");
 
       await addDoc(collection(db, "products"), {
         storeTitle,
@@ -151,12 +148,11 @@ if (form) {
       alert("上架失敗：" + error.message);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.innerText = "確認發布商品";
     }
   });
 }
 
-// 2. 開團商品監聽與管理列表
+// 3. 管理已上架商品
 const adminProductsContainer = document.getElementById('admin-products-list');
 onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
   cachedProductsList = [];
@@ -170,7 +166,6 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
   }
 
   let adminHtml = "";
-
   snapshot.forEach(docSnap => {
     const prod = { id: docSnap.id, ...docSnap.data() };
     cachedProductsList.push(prod);
@@ -195,9 +190,7 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
     }).join('');
 
     let statusBadge = `<span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-bold">🟢 上架中</span>`;
-    if (prod.status === "archived") {
-      statusBadge = `<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded font-bold">⚪ 已下架 (前台隱藏)</span>`;
-    }
+    if (prod.status === "archived") statusBadge = `<span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded font-bold">⚪ 已下架</span>`;
 
     adminHtml += `
       <div class="p-4 border rounded-xl bg-white shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -209,9 +202,7 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
               ${statusBadge}
             </div>
             <h4 class="font-bold text-gray-900">${prod.productName}</h4>
-            <div class="flex flex-wrap gap-1.5 mt-2">
-              ${optionsBadges}
-            </div>
+            <div class="flex flex-wrap gap-1.5 mt-2">${optionsBadges}</div>
           </div>
         </div>
 
@@ -219,16 +210,9 @@ onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (sna
           <button onclick="openEditProductModal('${prod.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded border font-bold">
             ✏️ 編輯商品全貌
           </button>
-          
-          ${prod.status === 'archived' ? `
-            <button onclick="changeProductStatus('${prod.id}', 'active')" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded border font-bold">
-              ⬆️ 重新上架
-            </button>
-          ` : `
-            <button onclick="changeProductStatus('${prod.id}', 'archived')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border font-bold">
-              📦 整件下架
-            </button>
-          `}
+          <button onclick="changeProductStatus('${prod.id}', '${prod.status === 'archived' ? 'active' : 'archived'}')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded border font-bold">
+            ${prod.status === 'archived' ? '⬆️ 重新上架' : '📦 整件下架'}
+          </button>
         </div>
       </div>
     `;
@@ -244,11 +228,10 @@ window.toggleSingleOptionStock = async (productId, optionIdx) => {
 
   const newOptions = [...prod.options];
   newOptions[optionIdx].isOutOfStock = !newOptions[optionIdx].isOutOfStock;
-
   try {
     await updateDoc(doc(db, "products", productId), { options: newOptions });
   } catch (e) {
-    alert("更新缺貨狀態失敗：" + e.message);
+    alert("更新狀態失敗：" + e.message);
   }
 };
 
@@ -257,7 +240,7 @@ window.changeProductStatus = async (productId, newStatus) => {
     await updateDoc(doc(db, "products", productId), { status: newStatus });
     alert("✅ 商品狀態已更新！");
   } catch (e) {
-    alert("更新狀態失敗：" + e.message);
+    alert("更新失敗：" + e.message);
   }
 };
 
@@ -272,10 +255,7 @@ window.openEditProductModal = (productId) => {
 
   const container = document.getElementById('edit-options-container');
   container.innerHTML = "";
-
-  (prod.options || []).forEach(opt => {
-    window.addEditOptionRow(opt.name, opt.price, !!opt.isOutOfStock);
-  });
+  (prod.options || []).forEach(opt => window.addEditOptionRow(opt.name, opt.price, !!opt.isOutOfStock));
 
   document.getElementById('edit-product-modal').classList.remove('hidden');
 };
@@ -316,7 +296,7 @@ if (editForm) {
         imageUrl: imageUrl || "https://via.placeholder.com/300?text=No+Image",
         options
       });
-      alert("🎉 商品與缺貨狀態更新成功！");
+      alert("🎉 修改成功！");
       closeEditProductModal();
     } catch (err) {
       alert("修改失敗：" + err.message);
@@ -324,7 +304,7 @@ if (editForm) {
   });
 }
 
-// 3. 代下單
+// 4. 代下單
 const proxyForm = document.getElementById('proxy-order-form');
 if (proxyForm) {
   proxyForm.addEventListener('submit', async (e) => {
@@ -336,36 +316,41 @@ if (proxyForm) {
     const prodVal = document.getElementById('proxy-product-select').value;
     const qtyVal = Number(document.getElementById('proxy-qty').value);
 
-    if (!userVal || !prodVal) return alert("請完整選擇團員與商品選項！");
+    if (!userVal || !prodVal) return alert("請選擇團員與商品！");
 
-    const targetUser = cachedUsersMap[userVal] || { uid: userVal, nickname: "團員", email: "團主新增" };
+    const targetUser = cachedUsersMap[userVal] || { uid: userVal, nickname: "團員", email: "" };
     const [pId, optIndexStr] = prodVal.split('___');
     const targetProduct = cachedProductsList.find(p => p.id === pId);
     const targetOption = targetProduct ? targetProduct.options[Number(optIndexStr)] : null;
 
     if (!targetProduct || !targetOption) return alert("找不到商品規格！");
 
+    const itemObj = {
+      storeTitle: targetProduct.storeTitle,
+      productName: targetProduct.productName,
+      optionName: targetOption.name,
+      price: targetOption.price,
+      qty: qtyVal
+    };
+
     try {
       await addDoc(collection(db, "orders"), {
         userId: targetUser.uid,
         userName: targetUser.nickname || "團員",
         userEmail: targetUser.email || "",
-        storeTitle: targetProduct.storeTitle,
-        productName: targetProduct.productName,
-        optionName: targetOption.name,
-        price: targetOption.price,
-        qty: qtyVal,
+        items: [itemObj],
+        totalAmount: targetOption.price * qtyVal,
         note: "團主手動代下單",
         status: "已下單",
         historyLogs: [{
-          action: `團主手動新增/代下單：${targetProduct.productName} (${targetOption.name}) x${qtyVal}`,
+          action: `團主手動代下單：${targetProduct.productName} (${targetOption.name}) x${qtyVal}`,
           operator: currentUser.email,
           timestamp: new Date().toLocaleString()
         }],
         createdAt: serverTimestamp()
       });
 
-      alert("✅ 成功新增訂單！");
+      alert("✅ 成功代下單！");
       proxyForm.reset();
     } catch (err) {
       alert("新增失敗：" + err.message);
@@ -373,7 +358,7 @@ if (proxyForm) {
   });
 }
 
-// 4. 團員名單監聽
+// 5. 團員名單監聽
 const memberListContainer = document.getElementById('member-list-container');
 onSnapshot(collection(db, "users"), (snapshot) => {
   cachedUsersMap = {};
@@ -403,7 +388,7 @@ onSnapshot(collection(db, "users"), (snapshot) => {
       <div class='p-3 flex justify-between items-center hover:bg-gray-50'>
         <div>
           <div class='font-bold text-gray-900 text-base flex items-center gap-2'>
-            🏷️ 團員暱稱：<span class="text-blue-600 font-extrabold">${nickname}</span>
+            🏷️ 暱稱：<span class="text-blue-600 font-extrabold">${nickname}</span>
             <button onclick="editNickname('${uId}', '${nickname}')" class='text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded border'>✏️ 改暱稱</button>
           </div>
           <div class='text-xs text-gray-500 font-mono mt-1'>📧 Gmail: ${email}</div>
@@ -429,60 +414,12 @@ window.editNickname = async (userId, oldNickname) => {
   }
 };
 
-// 5. 編輯訂單 (支援修改備註)
-window.editOrderFull = async (orderId) => {
-  const targetOrder = cachedOrdersList.find(o => o.id === orderId);
-  if (!targetOrder) return;
-
-  const newProductName = prompt("修改【商品名稱】：", targetOrder.productName || "");
-  if (newProductName === null) return;
-
-  const newOptionName = prompt("修改【款式規格】：", targetOrder.optionName || "");
-  if (newOptionName === null) return;
-
-  const newPrice = prompt("修改【單價 NT$】：", targetOrder.price || 0);
-  if (newPrice === null) return;
-
-  const newQty = prompt("修改【數量】：", targetOrder.qty || 1);
-  if (newQty === null) return;
-
-  const newNote = prompt("修改【買家訂單備註】：", targetOrder.note || "");
-  if (newNote === null) return;
-
-  const newStatus = prompt("修改【訂單狀態】(例如: 已下單 / 已付款 / 已取消)：", targetOrder.status || "已下單");
-  if (newStatus === null) return;
-
-  const noteLog = prompt("請輸入變更歷史說明（將記在日誌中）：", "團主修改細項");
-
-  const currentUser = auth.currentUser;
-
-  try {
-    await updateDoc(doc(db, "orders", orderId), {
-      productName: newProductName.trim(),
-      optionName: newOptionName.trim(),
-      price: Number(newPrice),
-      qty: Number(newQty),
-      note: newNote.trim(),
-      status: newStatus.trim(),
-      historyLogs: arrayUnion({
-        action: `編輯訂單: ${newProductName} (${newOptionName}) x${newQty}, 備註: ${newNote || '無'}, 狀態: ${newStatus} (說明: ${noteLog || '無'})`,
-        operator: currentUser ? currentUser.email : "團主",
-        timestamp: new Date().toLocaleString()
-      })
-    });
-    alert("✅ 訂單資料已更新！");
-  } catch (err) {
-    alert("修改失敗：" + err.message);
-  }
-};
-
-// 6. 取消/刪除訂單
+// 6. 刪除/取消訂單
 window.cancelOrder = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
 
-  const mode = confirm(`要如何處理這筆【${targetOrder.productName}】訂單？\n\n[確定]：將狀態改為「已取消」(保留紀錄)\n[取消]：直接將此訂單刪除`);
-
+  const mode = confirm(`要如何處理這筆訂單？\n\n[確定]：改為「已取消」(保留紀錄)\n[取消]：直接『徹底刪除』`);
   const currentUser = auth.currentUser;
 
   try {
@@ -490,16 +427,16 @@ window.cancelOrder = async (orderId) => {
       await updateDoc(doc(db, "orders", orderId), {
         status: "已取消",
         historyLogs: arrayUnion({
-          action: "團主將訂單狀態標記為 [已取消]",
+          action: "團主將訂單標記為 [已取消]",
           operator: currentUser ? currentUser.email : "團主",
           timestamp: new Date().toLocaleString()
         })
       });
-      alert("✅ 訂單已更新為「已取消」！");
+      alert("✅ 已更新為「已取消」！");
     } else {
-      if (confirm("⚠️ 確定要直接從資料庫『徹底刪除』這筆訂單嗎？（無法復原）")) {
+      if (confirm("⚠️ 確定要徹底刪除此訂單嗎？")) {
         await deleteDoc(doc(db, "orders", orderId));
-        alert("🗑️ 訂單已成功刪除！");
+        alert("🗑️ 訂單已刪除！");
       }
     }
   } catch (e) {
@@ -507,7 +444,7 @@ window.cancelOrder = async (orderId) => {
   }
 };
 
-// 7. 合併訂單彈窗與執行
+// 7. 智慧合併訂單 (品項並存、同品加總、金額重新 recalculated 需求 3)
 window.openMergeModal = () => {
   const sourceSel = document.getElementById('merge-source-select');
   const targetSel = document.getElementById('merge-target-select');
@@ -516,7 +453,10 @@ window.openMergeModal = () => {
   cachedOrdersList.forEach(o => {
     const uMatch = cachedUsersMap[o.userId];
     const name = uMatch ? uMatch.nickname : (o.userName || '團員');
-    html += `<option value="${o.id}">[${name}] ${o.productName}-${o.optionName} (x${o.qty || 1})</option>`;
+    const items = o.items || [{ productName: o.productName, optionName: o.optionName, price: o.price, qty: o.qty }];
+    const itemsSummary = items.map(i => `${i.productName}(${i.optionName})x${i.qty}`).join(', ');
+
+    html += `<option value="${o.id}">[${name}] $${o.totalAmount || 0} - ${itemsSummary}</option>`;
   });
 
   sourceSel.innerHTML = html;
@@ -531,21 +471,37 @@ window.executeMergeOrders = async () => {
   const targetId = document.getElementById('merge-target-select').value;
 
   if (!sourceId || !targetId) return alert("請完整選取來源與目標訂單！");
-  if (sourceId === targetId) return alert("來源訂單與目標訂單不能相同！");
+  if (sourceId === targetId) return alert("來源與目標訂單不能相同！");
 
   const sourceOrd = cachedOrdersList.find(o => o.id === sourceId);
   const targetOrd = cachedOrdersList.find(o => o.id === targetId);
 
-  if (!confirm(`確定要把【${sourceOrd.productName}-${sourceOrd.optionName} x${sourceOrd.qty}】\n合併併入【${targetOrd.productName}-${targetOrd.optionName} x${targetOrd.qty}】嗎？`)) return;
+  const sourceItems = sourceOrd.items || [{ storeTitle: sourceOrd.storeTitle, productName: sourceOrd.productName, optionName: sourceOrd.optionName, price: sourceOrd.price, qty: sourceOrd.qty }];
+  const targetItems = [...(targetOrd.items || [{ storeTitle: targetOrd.storeTitle, productName: targetOrd.productName, optionName: targetOrd.optionName, price: targetOrd.price, qty: targetOrd.qty }])];
+
+  // 智慧合併：若品項、規格完全相同則加總 qty，不同則保留新增為多品項
+  sourceItems.forEach(sItem => {
+    const matchIndex = targetItems.findIndex(tItem => tItem.productName === sItem.productName && tItem.optionName === sItem.optionName);
+    if (matchIndex > -1) {
+      targetItems[matchIndex].qty += sItem.qty;
+    } else {
+      targetItems.push({ ...sItem });
+    }
+  });
+
+  // 重新 recalculate 總金額
+  const newTotalAmount = targetItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+  if (!confirm(`確定要將兩筆訂單合併嗎？\n合併後包含 ${targetItems.length} 種品項，總金額：NT$ ${newTotalAmount}`)) return;
 
   const currentUser = auth.currentUser;
-  const newQty = (targetOrd.qty || 1) + (sourceOrd.qty || 1);
 
   try {
     await updateDoc(doc(db, "orders", targetId), {
-      qty: newQty,
+      items: targetItems,
+      totalAmount: newTotalAmount,
       historyLogs: arrayUnion({
-        action: `合併訂單：併入 (${sourceOrd.productName} x${sourceOrd.qty})，數量加總為 ${newQty}`,
+        action: `合併訂單：併入訂單 ${sourceId.substring(0,5)}，品項已加總並重計總金額為 NT$ ${newTotalAmount}`,
         operator: currentUser ? currentUser.email : "團主",
         timestamp: new Date().toLocaleString()
       })
@@ -553,23 +509,36 @@ window.executeMergeOrders = async () => {
 
     await deleteDoc(doc(db, "orders", sourceId));
 
-    alert("🎉 訂單合併成功！");
+    alert("🎉 訂單成功合併！所有品項已並存/加總！");
     closeMergeModal();
   } catch(e) {
     alert("合併失敗：" + e.message);
   }
 };
 
-// 8. 訂單總覽監聽與渲染 (顯眼呈現象買家備註)
+// 8. 訂單總覽監聽 & 雙重金額/商品統計總覽 (需求 3, 5)
 const orderListContainer = document.getElementById('order-list-container');
+const memberSummaryContainer = document.getElementById('member-summary-container');
+const grandTotalAmountEl = document.getElementById('grand-total-amount');
+const grandTotalQtyEl = document.getElementById('grand-total-qty');
+
 if (orderListContainer) {
   onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
     cachedOrdersList = [];
     if (snapshot.empty) {
       orderListContainer.innerHTML = "<p class='text-gray-500'>目前尚無下單紀錄。</p>";
+      if(grandTotalAmountEl) grandTotalAmountEl.innerText = "NT$ 0";
+      if(grandTotalQtyEl) grandTotalQtyEl.innerText = "0 件";
+      if(memberSummaryContainer) memberSummaryContainer.innerHTML = "<p class='text-xs text-gray-400'>無統計資料</p>";
       return;
     }
+
+    let grandTotalSum = 0;
+    let grandTotalPieces = 0;
+    const memberStats = {}; // 個別團員統計對象
+
     let html = `<div class='space-y-4'>`;
+
     snapshot.forEach((docSnap) => {
       const order = { id: docSnap.id, ...docSnap.data() };
       cachedOrdersList.push(order);
@@ -578,13 +547,57 @@ if (orderListContainer) {
       const showNickname = userMatch ? userMatch.nickname : (order.userName || "團員");
       const showEmail = userMatch ? userMatch.email : (order.userEmail || "無 Email");
 
+      // 解析單/多品項
+      const itemsList = order.items || [{
+        storeTitle: order.storeTitle || '團購',
+        productName: order.productName,
+        optionName: order.optionName,
+        price: order.price || 0,
+        qty: order.qty || 1
+      }];
+
+      const orderSum = order.totalAmount || itemsList.reduce((sum, i) => sum + (i.price * i.qty), 0);
+
+      // 非取消狀態才計入全團財務統計
+      if (order.status !== "已取消") {
+        grandTotalSum += orderSum;
+
+        // 計算個人統計
+        if (!memberStats[showNickname]) {
+          memberStats[showNickname] = { email: showEmail, totalSpent: 0, itemsMap: {} };
+        }
+        memberStats[showNickname].totalSpent += orderSum;
+
+        itemsList.forEach(i => {
+          grandTotalPieces += (i.qty || 1);
+          const key = `${i.productName}(${i.optionName})`;
+          memberStats[showNickname].itemsMap[key] = (memberStats[showNickname].itemsMap[key] || 0) + i.qty;
+        });
+      }
+
+      // 品項列表 HTML
+      let itemsHtml = `<div class="divide-y border rounded-lg bg-gray-50 overflow-hidden my-2">`;
+      itemsList.forEach(i => {
+        itemsHtml += `
+          <div class="p-2.5 flex justify-between items-center text-xs">
+            <div>
+              <span class="font-bold text-gray-800">${i.productName}</span>
+              <span class="text-blue-600 font-medium"> (${i.optionName})</span>
+            </div>
+            <div class="font-mono text-gray-700 font-bold">NT$ ${i.price} x ${i.qty} = $${i.price * i.qty}</div>
+          </div>
+        `;
+      });
+      itemsHtml += `</div>`;
+
+      // 歷史日誌 Logs
       let logsHtml = '';
       if (order.historyLogs && order.historyLogs.length > 0) {
         logsHtml = `<div class="mt-3 pt-2 border-t border-dashed border-gray-200 space-y-1">
-          <div class="text-xs font-bold text-gray-500">📜 團主專屬變更履歷 (Logs)：</div>`;
+          <div class="text-[11px] font-bold text-gray-500">📜 團主操作履歷 (Logs)：</div>`;
         order.historyLogs.forEach(log => {
           logsHtml += `
-            <div class="text-xs text-gray-600 bg-gray-50 p-1.5 rounded flex justify-between items-center">
+            <div class="text-[11px] text-gray-600 bg-gray-50 p-1.5 rounded flex justify-between items-center">
               <span>• ${log.action} <span class="text-gray-400">(${log.operator})</span></span>
               <span class="text-[10px] text-gray-400 font-mono">${log.timestamp}</span>
             </div>
@@ -597,37 +610,57 @@ if (orderListContainer) {
         <div class='p-4 border rounded-xl bg-white shadow-sm'>
           <div class='flex justify-between items-start mb-2 border-b pb-2'>
             <div>
-              <div class='font-black text-blue-700 text-lg'>👤 團員暱稱：${showNickname}</div>
+              <div class='font-black text-blue-700 text-base'>👤 團員暱稱：${showNickname}</div>
               <div class='text-xs text-gray-500 font-mono'>📧 Email: ${showEmail}</div>
             </div>
             <div class="flex items-center gap-1.5">
               <span class='text-xs bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded'>${order.status || '已下單'}</span>
-              <button onclick="editOrderFull('${order.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded border font-bold">
-                ✏️ 修改細項/備註
-              </button>
               <button onclick="cancelOrder('${order.id}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded border font-bold">
                 🚫 取消/刪除
               </button>
             </div>
           </div>
-          <div class='text-xs font-semibold text-blue-800 bg-blue-50 inline-block px-2 py-0.5 rounded mb-1'>
-            📢 ${order.storeTitle || '未分組團購'}
-          </div>
-          <div class='text-sm text-gray-800'>
-            <strong>商品：</strong>${order.productName || ''} - <span class="text-blue-600 font-bold">${order.optionName || ''}</span> x${order.qty || 1}
-          </div>
-          
+
+          ${itemsHtml}
+
           ${order.note ? `<div class='text-xs text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg mt-2 font-medium'>📝 買家訂單備註：${order.note}</div>` : ''}
 
-          <div class='text-sm text-gray-800 mt-1.5'>
-            <strong>總金額：</strong>NT$ ${(order.price || 0) * (order.qty || 1)}
+          <div class='text-base font-extrabold text-blue-700 mt-2'>
+            本單小計：NT$ ${orderSum}
           </div>
 
           ${logsHtml}
         </div>
       `;
     });
+
     html += `</div>`;
     orderListContainer.innerHTML = html;
+
+    // 渲染全團總金額與商品總數 (需求 5)
+    if(grandTotalAmountEl) grandTotalAmountEl.innerText = `NT$ ${grandTotalSum}`;
+    if(grandTotalQtyEl) grandTotalQtyEl.innerText = `${grandTotalPieces} 件`;
+
+    // 渲染個別團員消費統計卡片 (需求 5)
+    if(memberSummaryContainer) {
+      let memberHtml = "";
+      Object.keys(memberStats).forEach(name => {
+        const stat = memberStats[name];
+        const itemsStr = Object.keys(stat.itemsMap).map(k => `${k} x${stat.itemsMap[k]}`).join(', ');
+
+        memberHtml += `
+          <div class="bg-white p-3 rounded-lg border shadow-xs space-y-1">
+            <div class="flex justify-between items-center border-b pb-1">
+              <span class="font-extrabold text-blue-700 text-sm">👤 ${name}</span>
+              <span class="font-black text-blue-600 text-sm">NT$ ${stat.totalSpent}</span>
+            </div>
+            <div class="text-[11px] text-gray-600 truncate" title="${itemsStr}">
+              📦 購買清單：${itemsStr || '無'}
+            </div>
+          </div>
+        `;
+      });
+      memberSummaryContainer.innerHTML = memberHtml || "<p class='text-xs text-gray-400'>目前無有效消費團員。</p>";
+    }
   });
 }

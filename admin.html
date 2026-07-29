@@ -8,6 +8,18 @@
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 pb-16">
 
+  <!-- 未授權阻擋畫面 (權限防護 需求 1) -->
+  <div id="unauthorized-overlay" class="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full rounded-2xl p-6 text-center shadow-2xl space-y-4">
+      <div class="text-5xl">🔒</div>
+      <h2 class="text-2xl font-black text-gray-800">權限受限</h2>
+      <p class="text-sm text-gray-600">本後台僅限團主帳號 (<span class="font-mono text-blue-600 font-bold">chuchu20011225@gmail.com</span>) 存取。</p>
+      <a href="index.html" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow transition text-sm">
+        返回團購賣場前台
+      </a>
+    </div>
+  </div>
+
   <!-- 頂部列 -->
   <nav class="bg-slate-800 text-white p-4 shadow-md">
     <div class="max-w-5xl mx-auto flex justify-between items-center">
@@ -16,14 +28,41 @@
     </div>
   </nav>
 
-  <main class="max-w-5xl mx-auto p-4 sm:p-6">
+  <main class="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+    
+    <!-- 📊 全團與個人金額/商品總覽統計面板 (需求 5) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-5 rounded-2xl shadow-md flex justify-between items-center">
+        <div>
+          <div class="text-xs font-bold text-blue-200 uppercase tracking-wider">全團總下單營收</div>
+          <div id="grand-total-amount" class="text-3xl font-black mt-1">NT$ 0</div>
+        </div>
+        <div class="text-right">
+          <div class="text-xs font-bold text-blue-200">累積商品總件數</div>
+          <div id="grand-total-qty" class="text-2xl font-black mt-1">0 件</div>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between">
+        <div class="text-xs font-bold text-gray-500 mb-1">💡 後台快捷控制</div>
+        <div class="flex gap-2">
+          <button onclick="openMergeModal()" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2 rounded-xl border border-indigo-200 text-xs transition">
+            🔗 合併跨單 / 多品項
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 頁籤列 -->
-    <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg overflow-hidden shadow-sm flex-wrap">
-      <button id="tab-add-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white text-sm">
+    <div class="flex border-b border-gray-300 bg-white rounded-t-lg overflow-hidden shadow-sm flex-wrap">
+      <button id="tab-orders-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white text-sm">
+        📦 訂單管理 & 團員消費總額
+      </button>
+      <button id="tab-add-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
         ➕ 上架商品
       </button>
       <button id="tab-manage-products-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
-        🏷️ 管理/編輯已上架商品
+        🏷️ 管理已上架商品
       </button>
       <button id="tab-proxy-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
         🙋 團主代下單
@@ -31,13 +70,35 @@
       <button id="tab-members-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
         👥 團員名單
       </button>
-      <button id="tab-orders-btn" class="flex-1 min-w-[120px] py-3 px-3 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 text-sm">
-        📦 訂單管理
-      </button>
     </div>
 
-    <!-- 頁籤 1: 商品上架 -->
-    <div id="section-add-product" class="bg-white p-6 rounded-b-lg shadow-sm">
+    <!-- 頁籤 1: 訂單總覽 (需求 3, 5) -->
+    <div id="section-orders" class="bg-white p-6 rounded-b-lg shadow-sm">
+      <!-- 各團員個人消費統計折疊卡片區 -->
+      <div class="mb-6 p-4 bg-slate-50 border rounded-xl space-y-2">
+        <h3 class="text-sm font-bold text-gray-700 flex items-center justify-between">
+          <span>👥 各團員個人消費與下單商品統計</span>
+          <span class="text-xs text-gray-500 font-normal">(即時比對計算)</span>
+        </h3>
+        <div id="member-summary-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <!-- JS 動態生成各團員消費總額 -->
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mb-4 border-b pb-2">
+        <h2 class="text-lg font-bold text-gray-800">所有訂單明細列表</h2>
+        <button onclick="openMergeModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow transition">
+          🔗 合併訂單
+        </button>
+      </div>
+
+      <div id="order-list-container" class="space-y-4">
+        <p class="text-gray-500 text-sm">載入訂單資料中...</p>
+      </div>
+    </div>
+
+    <!-- 頁籤 2: 商品上架 -->
+    <div id="section-add-product" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">新增團購商品</h2>
       <form id="add-product-form" class="space-y-4 max-w-xl">
         <div>
@@ -54,7 +115,6 @@
           <input type="file" id="product-img-file" accept="image/*" class="w-full text-xs text-gray-500">
         </div>
         
-        <!-- 動態款式選項容器 -->
         <div class="space-y-3 pt-2 border-t">
           <div class="flex justify-between items-center mb-1">
             <label class="block text-sm font-bold text-gray-700">商品款式與價格選項</label>
@@ -62,7 +122,6 @@
               ➕ 新增款式選項
             </button>
           </div>
-
           <div id="options-container" class="space-y-2"></div>
         </div>
 
@@ -72,15 +131,15 @@
       </form>
     </div>
 
-    <!-- 頁籤 2: 管理/編輯已上架商品 (新增) -->
+    <!-- 頁籤 3: 管理已上架商品 -->
     <div id="section-manage-products" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
-      <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🏷️ 已上架商品管理（修改品相 / 缺貨 / 下架）</h2>
+      <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🏷️ 已上架商品管理</h2>
       <div id="admin-products-list" class="space-y-4">
         <p class="text-gray-500 text-sm">載入商品列表中...</p>
       </div>
     </div>
 
-    <!-- 頁籤 3: 團主幫團員代下單 -->
+    <!-- 頁籤 4: 團主幫團員代下單 -->
     <div id="section-proxy" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🙋 團主協助團員手動新增訂單</h2>
       <form id="proxy-order-form" class="space-y-4 max-w-xl">
@@ -107,28 +166,39 @@
       </form>
     </div>
 
-    <!-- 頁籤 4: 團員名單 -->
+    <!-- 頁籤 5: 團員名單 -->
     <div id="section-members" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">已註冊團員名單</h2>
       <div id="member-list-container">
         <p class="text-gray-500 text-sm">載入團員資料中...</p>
       </div>
     </div>
-
-    <!-- 頁籤 5: 訂單管理 -->
-    <div id="section-orders" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
-      <div class="flex justify-between items-center mb-4 border-b pb-2">
-        <h2 class="text-xl font-bold text-gray-700">📦 訂單總覽與紀錄</h2>
-        <button onclick="openMergeModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition flex items-center gap-1">
-          🔗 合併訂單功能
-        </button>
-      </div>
-
-      <div id="order-list-container">
-        <p class="text-gray-500 text-sm">載入訂單資料中...</p>
-      </div>
-    </div>
   </main>
+
+  <!-- 合併訂單 Modal (需求 3) -->
+  <div id="merge-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-lg font-bold text-gray-800">🔗 合併兩筆訂單 (保留所有品項與加總金額)</h3>
+        <button onclick="closeMergeModal()" class="text-gray-400 text-2xl font-bold">&times;</button>
+      </div>
+      <p class="text-xs text-gray-500">將「來源訂單」內的品項完整合併併入「目標訂單」，並自動 recalculate 總金額與項目，最後刪除來源訂單。</p>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1">1. 選擇【來源訂單】(會被併入並刪除)</label>
+        <select id="merge-source-select" class="w-full border rounded p-2 text-xs"></select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-gray-700 mb-1">2. 選擇【目標訂單】(保留，品項合併與金額加總)</label>
+        <select id="merge-target-select" class="w-full border rounded p-2 text-xs"></select>
+      </div>
+
+      <button onclick="executeMergeOrders()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition text-sm">
+        確認執行合併
+      </button>
+    </div>
+  </div>
 
   <!-- 編輯商品 Modal -->
   <div id="edit-product-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
@@ -168,40 +238,15 @@
     </div>
   </div>
 
-  <!-- 合併訂單 Modal -->
-  <div id="merge-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white max-w-lg w-full rounded-2xl p-6 shadow-2xl space-y-4">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="text-lg font-bold text-gray-800">🔗 合併兩筆訂單</h3>
-        <button onclick="closeMergeModal()" class="text-gray-400 text-2xl font-bold">&times;</button>
-      </div>
-      <p class="text-xs text-gray-500">把「來源訂單」數量合併併入「目標訂單」，完成後自動刪除來源訂單。</p>
-
-      <div>
-        <label class="block text-xs font-bold text-gray-700 mb-1">1. 選擇【來源訂單】(會被併入並刪除)</label>
-        <select id="merge-source-select" class="w-full border rounded p-2 text-xs"></select>
-      </div>
-
-      <div>
-        <label class="block text-xs font-bold text-gray-700 mb-1">2. 選擇【目標訂單】(保留，數量加總)</label>
-        <select id="merge-target-select" class="w-full border rounded p-2 text-xs"></select>
-      </div>
-
-      <button onclick="executeMergeOrders()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition text-sm">
-        確認執行合併
-      </button>
-    </div>
-  </div>
-
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./products.js"></script>
   <script>
     const tabs = [
+      { btn: 'tab-orders-btn', sec: 'section-orders' },
       { btn: 'tab-add-btn', sec: 'section-add-product' },
       { btn: 'tab-manage-products-btn', sec: 'section-manage-products' },
       { btn: 'tab-proxy-btn', sec: 'section-proxy' },
-      { btn: 'tab-members-btn', sec: 'section-members' },
-      { btn: 'tab-orders-btn', sec: 'section-orders' }
+      { btn: 'tab-members-btn', sec: 'section-members' }
     ];
 
     tabs.forEach(t => {
