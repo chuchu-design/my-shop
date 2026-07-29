@@ -1,5 +1,5 @@
 import { db, auth } from "./auth.js";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = "chuchu20011225@gmail.com";
 
@@ -14,7 +14,7 @@ let cachedUsersMap = {};
 let cachedProductsList = [];
 let cachedOrdersList = [];
 
-// 1. 上架商品
+// 1. 商品發布
 const form = document.getElementById('add-product-form');
 if (form) {
   form.addEventListener('submit', async (e) => {
@@ -69,14 +69,14 @@ if (form) {
   });
 }
 
-// 2. 代下單
+// 2. 代下單/新增訂單
 const proxyForm = document.getElementById('proxy-order-form');
 if (proxyForm) {
   proxyForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const currentUser = auth.currentUser;
     if (!currentUser || currentUser.email !== ADMIN_EMAIL) {
-      alert("僅有團主可代下單！");
+      alert("僅有團主可新增訂單！");
       return;
     }
 
@@ -85,17 +85,17 @@ if (proxyForm) {
     const qtyVal = Number(document.getElementById('proxy-qty').value);
 
     if (!userVal || !prodVal) {
-      alert("請選擇團員與商品！");
+      alert("請完整選擇團員與商品選項！");
       return;
     }
 
-    const targetUser = cachedUsersMap[userVal] || { uid: userVal, nickname: "指定團員", email: "團主手動輸入" };
+    const targetUser = cachedUsersMap[userVal] || { uid: userVal, nickname: "團員", email: "團主新增" };
     const [pId, optIndexStr] = prodVal.split('___');
     const targetProduct = cachedProductsList.find(p => p.id === pId);
     const targetOption = targetProduct ? targetProduct.options[Number(optIndexStr)] : null;
 
     if (!targetProduct || !targetOption) {
-      alert("找不到對應商品選項，請重新選取");
+      alert("找不到商品規格！");
       return;
     }
 
@@ -109,19 +109,19 @@ if (proxyForm) {
         optionName: targetOption.name,
         price: targetOption.price,
         qty: qtyVal,
-        status: "團主代下單",
+        status: "已下單",
         historyLogs: [{
-          action: `團主手動代下單：${targetProduct.productName} (${targetOption.name}) x${qtyVal}`,
+          action: `團主手動新增/代下單：${targetProduct.productName} (${targetOption.name}) x${qtyVal}`,
           operator: currentUser.email,
           timestamp: new Date().toLocaleString()
         }],
         createdAt: serverTimestamp()
       });
 
-      alert("✅ 成功幫【" + (targetUser.nickname || '團員') + "】完成代下單！");
+      alert("✅ 成功新增訂單！");
       proxyForm.reset();
     } catch (err) {
-      alert("代下單失敗：" + err.message);
+      alert("新增失敗：" + err.message);
     }
   });
 }
@@ -170,7 +170,7 @@ onSnapshot(collection(db, "users"), (snapshot) => {
   if(proxyUserSelect) proxyUserSelect.innerHTML = selectHtml;
 });
 
-// 4. 商品開團監聽
+// 4. 開團商品監聽
 onSnapshot(collection(db, "products"), (snapshot) => {
   cachedProductsList = [];
   const proxyProductSelect = document.getElementById('proxy-product-select');
@@ -200,7 +200,7 @@ window.editNickname = async (userId, oldNickname) => {
   }
 };
 
-// 5. 完整編輯訂單 (支援商品、規格、單價、數量、狀態修改) (需求 1)
+// 5. 編輯訂單全欄位 (包含商品、數量、單價、狀態)
 window.editOrderFull = async (orderId) => {
   const targetOrder = cachedOrdersList.find(o => o.id === orderId);
   if (!targetOrder) return;
@@ -217,10 +217,10 @@ window.editOrderFull = async (orderId) => {
   const newQty = prompt("修改【數量】：", targetOrder.qty || 1);
   if (newQty === null) return;
 
-  const newStatus = prompt("修改【訂單狀態】(如：已下單 / 已付款 / 已發貨)：", targetOrder.status || "已下單");
+  const newStatus = prompt("修改【訂單狀態】(例如: 已下單 / 已付款 / 已取消)：", targetOrder.status || "已下單");
   if (newStatus === null) return;
 
-  const note = prompt("備註 (記錄於 Logs)：", "團主後台全面修改欄位");
+  const note = prompt("請輸入變更備註（將記在日誌中）：", "團主修改細項");
 
   const currentUser = auth.currentUser;
 
@@ -232,18 +232,49 @@ window.editOrderFull = async (orderId) => {
       qty: Number(newQty),
       status: newStatus.trim(),
       historyLogs: arrayUnion({
-        action: `團主修改訂單細項: ${newProductName} (${newOptionName}) x${newQty}, 單價: $${newPrice}, 狀態: ${newStatus} (備註: ${note || '無'})`,
+        action: `編輯訂單: ${newProductName} (${newOptionName}) x${newQty}, 單價: $${newPrice}, 狀態: ${newStatus} (備註: ${note || '無'})`,
         operator: currentUser ? currentUser.email : "團主",
         timestamp: new Date().toLocaleString()
       })
     });
-    alert("✅ 訂單資料已成功修改！");
+    alert("✅ 訂單資料已更新！");
   } catch (err) {
     alert("修改失敗：" + err.message);
   }
 };
 
-// 6. 合併訂單彈窗邏輯 (需求 1)
+// 6. 取消/刪除訂單
+window.cancelOrder = async (orderId) => {
+  const targetOrder = cachedOrdersList.find(o => o.id === orderId);
+  if (!targetOrder) return;
+
+  const mode = confirm(`要如何處理這筆【${targetOrder.productName}】訂單？\n\n[確定]：將狀態改為「已取消」(保留紀錄)\n[取消]：直接將此訂單刪除`);
+
+  const currentUser = auth.currentUser;
+
+  try {
+    if (mode) {
+      await updateDoc(doc(db, "orders", orderId), {
+        status: "已取消",
+        historyLogs: arrayUnion({
+          action: "團主將訂單狀態標記為 [已取消]",
+          operator: currentUser ? currentUser.email : "團主",
+          timestamp: new Date().toLocaleString()
+        })
+      });
+      alert("✅ 訂單已更新為「已取消」！");
+    } else {
+      if (confirm("⚠️ 確定要直接從資料庫『徹底刪除』這筆訂單嗎？（無法復原）")) {
+        await deleteDoc(doc(db, "orders", orderId));
+        alert("🗑️ 訂單已成功刪除！");
+      }
+    }
+  } catch (e) {
+    alert("操作失敗：" + e.message);
+  }
+};
+
+// 7. 合併訂單彈窗與執行
 window.openMergeModal = () => {
   const sourceSel = document.getElementById('merge-source-select');
   const targetSel = document.getElementById('merge-target-select');
@@ -272,23 +303,21 @@ window.executeMergeOrders = async () => {
   const sourceOrd = cachedOrdersList.find(o => o.id === sourceId);
   const targetOrd = cachedOrdersList.find(o => o.id === targetId);
 
-  if (!confirm(`確定要把【${sourceOrd.productName}-${sourceOrd.optionName} x${sourceOrd.qty}】\n合併進【${targetOrd.productName}-${targetOrd.optionName} x${targetOrd.qty}】嗎？\n(來源訂單會被移除)`)) return;
+  if (!confirm(`確定要把【${sourceOrd.productName}-${sourceOrd.optionName} x${sourceOrd.qty}】\n合併併入【${targetOrd.productName}-${targetOrd.optionName} x${targetOrd.qty}】嗎？`)) return;
 
   const currentUser = auth.currentUser;
   const newQty = (targetOrd.qty || 1) + (sourceOrd.qty || 1);
 
   try {
-    // 累加目標訂單數量並下記錄
     await updateDoc(doc(db, "orders", targetId), {
       qty: newQty,
       historyLogs: arrayUnion({
-        action: `合併訂單：併入訂單 (${sourceOrd.productName} x${sourceOrd.qty})，數量累加至 ${newQty}`,
+        action: `合併訂單：併入 (${sourceOrd.productName} x${sourceOrd.qty})，數量加總為 ${newQty}`,
         operator: currentUser ? currentUser.email : "團主",
         timestamp: new Date().toLocaleString()
       })
     });
 
-    // 刪除被合併的來源訂單
     await deleteDoc(doc(db, "orders", sourceId));
 
     alert("🎉 訂單合併成功！");
@@ -298,7 +327,7 @@ window.executeMergeOrders = async () => {
   }
 };
 
-// 7. 訂單總覽監聽
+// 8. 訂單總覽監聽與渲染
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
@@ -338,11 +367,13 @@ if (orderListContainer) {
               <div class='font-black text-blue-700 text-lg'>👤 團員暱稱：${showNickname}</div>
               <div class='text-xs text-gray-500 font-mono'>📧 Email: ${showEmail}</div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
               <span class='text-xs bg-green-100 text-green-800 font-bold px-2 py-0.5 rounded'>${order.status || '已下單'}</span>
-              <button onclick="editOrderFull('${order.id}')" 
-                      class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded border font-bold">
-                ✏️ 編輯全細項/紀錄
+              <button onclick="editOrderFull('${order.id}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded border font-bold">
+                ✏️ 修改細項
+              </button>
+              <button onclick="cancelOrder('${order.id}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded border font-bold">
+                🚫 取消/刪除
               </button>
             </div>
           </div>
