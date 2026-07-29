@@ -13,10 +13,8 @@
     <div class="max-w-4xl mx-auto flex justify-between items-center">
       <h1 class="text-xl font-bold text-blue-600">🛒 團購賣場</h1>
       <div id="user-info" class="flex items-center gap-3">
-        <!-- 由 auth.js 動態渲染登入狀態 / 暱稱 -->
-        <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-1.5 rounded-lg font-medium">
-          Google 登入
-        </button>
+        <!-- 由 auth.js 動態渲染登入狀態 -->
+        <span class="text-xs text-gray-400">載入中...</span>
       </div>
     </div>
   </nav>
@@ -34,16 +32,14 @@
     </div>
   </main>
 
-  <!-- 引入身份驗證 -->
-  <script type="module" src="auth.js"></script>
-
-  <!-- 讀取商品邏輯 -->
+  <!-- 邏輯腳本：先載入 auth.js 確保 Firebase 初始化完成 -->
   <script type="module">
-    import { getFirestore, collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { db } from "./auth.js";
+    import { collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    const db = getFirestore();
     const container = document.getElementById('products-container');
 
+    // 即時連動 Firestore 裡面的商品
     const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
     onSnapshot(q, (snapshot) => {
       container.innerHTML = "";
@@ -83,8 +79,8 @@
         container.appendChild(card);
       });
     }, (err) => {
-      console.error("讀取失敗：", err);
-      container.innerHTML = "<p class='text-red-500'>無法載入商品，請確認登入狀態與 Firebase 權限。</p>";
+      console.error("同步失敗：", err);
+      container.innerHTML = `<p class='text-red-500'>無法載入商品 (${err.message})，請檢查 Firestore 權限規則。</p>`;
     });
   </script>
 </body>

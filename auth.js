@@ -1,118 +1,69 @@
-// 1. 載入 Firebase 核心、Auth 與 Firestore 模組
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 2. Firebase 設定
+// ⚠️ 請替換為你的 Firebase 專案配置資訊 ⚠️
 const firebaseConfig = {
-  apiKey: "AIzaSyCzTKsFrttWiWECWsHRvDTJ9N_XPH0bWEM",
-  authDomain: "my-shop-new-efdb0.firebaseapp.com",
-  projectId: "my-shop-new-efdb0",
-  storageBucket: "my-shop-new-efdb0.firebasestorage.app",
-  messagingSenderId: "986465274332",
-  appId: "1:986465274332:web:8a3a258549602f40c36719",
-  measurementId: "G-0DYCN7TFL9"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-// 3. 初始化服務
-const app = initializeApp(firebaseConfig);
+// 防重複初始化
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
 const provider = new GoogleAuthProvider();
 
-window.currentUser = null;
-window.userProfile = null;
+// 全局監聽登入狀態
+onAuthStateChanged(auth, async (user) => {
+  const userInfoDiv = document.getElementById('user-info');
+  if (!userInfoDiv) return;
 
-// Google 登入邏輯 (含首次暱稱設定)
-window.handleGoogleLogin = async function() {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    
-    // 檢查資料庫是否有此團員資料
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
+  if (user) {
+    // 檢查是否有暱稱
+    const userDocRef = doc(db, "users", user.uid);
+    const userDocSnap = await getDoc(userDocRef);
 
-    let nickname = "";
+    let nickname = user.displayName;
 
-    if (!userSnap.exists()) {
-      // 首次登入：要求輸入暱稱（強制不能留空）
-      while (!nickname || nickname.trim() === "") {
-        nickname = prompt("歡迎第一次使用！請輸入您的專屬暱稱（設定後無法自行修改）：");
-      }
-      nickname = nickname.trim();
-
-      // 儲存至資料庫
-      await setDoc(userRef, {
+    if (!userDocSnap.exists() || !userDocSnap.data().nickname) {
+      const inputName = prompt("歡迎第一次使用！請輸入您的暱稱（方便團主對帳）：", user.displayName || "");
+      nickname = inputName && inputName.trim() ? inputName.trim() : (user.displayName || "匿名團員");
+      
+      await setDoc(userDocRef, {
         uid: user.uid,
         email: user.email,
         nickname: nickname,
-        createdAt: new Date().toISOString()
-      });
-      alert(`暱稱設定完成！歡迎加入，${nickname}！`);
+        createdAt: new Date()
+      }, { merge: true });
     } else {
-      nickname = userSnap.data().nickname;
-      alert(`歡迎回來，${nickname}！`);
+      nickname = userDocSnap.data().nickname;
     }
 
-    window.userProfile = { uid: user.uid, email: user.email, nickname: nickname };
-  } catch (error) {
-    console.error("登入失敗:", error);
-    alert("登入失敗，請稍後再試！");
-  }
-};
+    userInfoDiv.innerHTML = `
+      <span class="text-sm font-semibold text-gray-700">👤 ${nickname}</span>
+      <button id="logout-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-3 py-1.5 rounded-lg">登出</button>
+    `;
 
-// 登出功能
-window.handleLogout = async function() {
-  await signOut(auth);
-  window.currentUser = null;
-  window.userProfile = null;
-  alert("已成功登出");
-  window.location.reload();
-};
-
-// 自動監聽登入狀態與載入暱稱
-onAuthStateChanged(auth, async (user) => {
-  window.currentUser = user;
-  const desktopInfo = document.getElementById('user-info-desktop');
-  const loginBtnDesktop = document.getElementById('login-btn-desktop');
-  const loginBtnMobile = document.getElementById('login-btn-mobile');
-  const orderNotice = document.getElementById('order-login-notice');
-
-  if (user) {
-    // 取得資料庫暱稱
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-    let displayName = user.displayName;
-
-    if (userSnap.exists()) {
-      window.userProfile = userSnap.data();
-      displayName = window.userProfile.nickname;
-    }
-
-    if (desktopInfo) desktopInfo.innerHTML = `👤 團員：${displayName}`;
-    if (loginBtnDesktop) {
-      loginBtnDesktop.innerText = "登出";
-      loginBtnDesktop.onclick = window.handleLogout;
-      loginBtnDesktop.className = "w-full bg-gray-500 text-white py-2 rounded-lg font-medium hover:bg-gray-600";
-    }
-    if (loginBtnMobile) {
-      loginBtnMobile.innerText = "登出";
-      loginBtnMobile.onclick = window.handleLogout;
-    }
-    if (orderNotice) orderNotice.classList.add('hidden');
+    document.getElementById('logout-btn')?.addEventListener('click', () => signOut(auth));
   } else {
-    window.userProfile = null;
-    if (desktopInfo) desktopInfo.innerHTML = "未登入";
-    if (loginBtnDesktop) {
-      loginBtnDesktop.innerText = "Google 登入";
-      loginBtnDesktop.onclick = window.handleGoogleLogin;
-      loginBtnDesktop.className = "w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700";
-    }
-    if (loginBtnMobile) {
-      loginBtnMobile.innerText = "登入";
-      loginBtnMobile.onclick = window.handleGoogleLogin;
-    }
-    if (orderNotice) orderNotice.classList.remove('hidden');
+    userInfoDiv.innerHTML = `
+      <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-1.5 rounded-lg font-medium">
+        Google 登入
+      </button>
+    `;
+
+    document.getElementById('login-btn')?.addEventListener('click', async () => {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (err) {
+        alert("登入失敗：" + err.message);
+      }
+    });
   }
 });
