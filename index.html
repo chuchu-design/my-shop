@@ -13,7 +13,6 @@
   <aside class="hidden md:flex flex-col w-64 bg-white border-r min-h-screen p-4">
     <h1 class="text-xl font-bold mb-6 text-indigo-600">🛍️ 代購賣場</h1>
     <nav class="flex flex-col space-y-2">
-      <!-- 點擊切換視角 -->
       <button onclick="switchTab('products')" id="tab-btn-products" class="w-full text-left p-3 rounded-lg bg-indigo-50 text-indigo-600 font-bold">
         🛒 開團商品大廳
       </button>
@@ -27,7 +26,7 @@
 
     <div class="mt-auto pt-4 border-t">
       <div id="user-info-desktop" class="text-sm text-gray-500 mb-2">未登入</div>
-      <button id="login-btn-desktop" onclick="handleGoogleLogin()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">
+      <button id="login-btn-desktop" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">
         Google 登入
       </button>
     </div>
@@ -36,7 +35,7 @@
   <!-- 2. 手機端頂部欄 -->
   <header class="md:hidden bg-white border-b p-4 flex justify-between items-center">
     <h1 class="text-lg font-bold text-indigo-600">🛍️ 代購賣場</h1>
-    <button id="login-btn-mobile" onclick="handleGoogleLogin()" class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg">
+    <button id="login-btn-mobile" class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg">
       登入
     </button>
   </header>
@@ -44,7 +43,7 @@
   <!-- 3. 主要內容區域 -->
   <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0">
     
-    <!-- 分頁 A：預設顯示的「商品大廳」 -->
+    <!-- 分頁 A：預設顯示「商品大廳」 -->
     <section id="view-products">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-2xl font-bold text-gray-800">🔥 現正熱賣 / 預購商品</h2>
@@ -57,7 +56,7 @@
       </div>
     </section>
 
-    <!-- 分頁 B：「我的訂單與轉單區」（預設隱藏，點擊才打開） -->
+    <!-- 分頁 B：「我的訂單與轉單區」 -->
     <section id="view-orders" class="hidden">
       <h2 class="text-2xl font-bold text-gray-800 mb-6">📋 我的訂單紀錄與轉單</h2>
       
@@ -66,7 +65,7 @@
         🔒 請先進行 Google 登入，才能查看個人的下單總紀錄與進行轉單操作。
       </div>
 
-      <!-- 訂單列表 (登入後顯示) -->
+      <!-- 訂單列表 -->
       <div id="my-orders-list" class="space-y-4">
         <p class="text-gray-400">登入後將載入您的歷史訂單...</p>
       </div>
@@ -74,7 +73,7 @@
 
   </main>
 
-  <!-- 4. 手機端底部捷徑欄（完全移除團主後台） -->
+  <!-- 4. 手機端底部捷徑欄 -->
   <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 text-xs text-center z-10">
     <button onclick="switchTab('products')" class="flex-1 py-1 text-indigo-600 font-bold">
       🛒<br>商品大廳
@@ -87,7 +86,7 @@
     </button>
   </nav>
 
-  <!-- 切換頁籤的分頁腳本 -->
+  <!-- 頁籤切換邏輯 -->
   <script>
     function switchTab(tabName) {
       const productsView = document.getElementById('view-products');
@@ -111,6 +110,8 @@
     }
   </script>
 
+  <!-- 引入 Google 登入與商品資料 -->
+  <script type="module" src="auth.js"></script>
   <script src="products.js"></script>
 </body>
 </html>
