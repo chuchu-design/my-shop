@@ -6,29 +6,30 @@
   <title>團主管理後台</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen text-gray-800">
+<body class="bg-gray-100 min-h-screen text-gray-800 pb-16">
 
   <!-- 頂部列 -->
   <nav class="bg-slate-800 text-white p-4 shadow-md">
     <div class="max-w-5xl mx-auto flex justify-between items-center">
       <h1 class="text-xl font-bold flex items-center gap-2">⚙️ 團主後台管理系統</h1>
-      <div id="user-info" class="flex items-center gap-3">
-        <!-- 登入狀態區 -->
-      </div>
+      <div id="user-info" class="flex items-center gap-3"></div>
     </div>
   </nav>
 
   <main class="max-w-5xl mx-auto p-4 sm:p-6">
-    <!-- 頁籤控制 -->
+    <!-- 頁籤列 -->
     <div class="flex border-b border-gray-300 mb-6 bg-white rounded-t-lg overflow-hidden shadow-sm">
       <button id="tab-add-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white">
-        ➕ 商品上架
+        ➕ 上架商品
+      </button>
+      <button id="tab-proxy-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+        🙋 團主代下單
       </button>
       <button id="tab-members-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-        👥 團員名單管理
+        👥 團員名單
       </button>
       <button id="tab-orders-btn" class="flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-        📦 訂單管理
+        📦 訂單管理 & 歷程
       </button>
     </div>
 
@@ -50,18 +51,17 @@
           <input type="file" id="product-img-file" accept="image/*" class="w-full text-xs text-gray-500">
         </div>
         
-        <!-- 款式選項 -->
         <div class="border p-3 rounded bg-gray-50 space-y-2">
           <label class="block text-xs font-bold text-gray-600">款式選項 1</label>
           <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="opt-name-1" required placeholder="款式名稱 (例: 江戶川柯南)" class="border rounded p-1.5 text-xs">
+            <input type="text" id="opt-name-1" required placeholder="款式名稱 (例: 盲抽一抽)" class="border rounded p-1.5 text-xs">
             <input type="number" id="opt-price-1" required placeholder="價格" class="border rounded p-1.5 text-xs">
           </div>
         </div>
         <div class="border p-3 rounded bg-gray-50 space-y-2">
           <label class="block text-xs font-bold text-gray-600">款式選項 2</label>
           <div class="grid grid-cols-2 gap-2">
-            <input type="text" id="opt-name-2" placeholder="款式名稱 (例: 怪盜基德)" class="border rounded p-1.5 text-xs">
+            <input type="text" id="opt-name-2" placeholder="款式名稱 (例: 端盒)" class="border rounded p-1.5 text-xs">
             <input type="number" id="opt-price-2" placeholder="價格" class="border rounded p-1.5 text-xs">
           </div>
         </div>
@@ -72,7 +72,34 @@
       </form>
     </div>
 
-    <!-- 頁籤 2: 團員名單 (可修改暱稱) -->
+    <!-- 頁籤 2: 團主幫團員代下單 (需求 2) -->
+    <div id="section-proxy" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
+      <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">🙋 團主協助團員下單</h2>
+      <form id="proxy-order-form" class="space-y-4 max-w-xl">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">1. 選擇團員</label>
+          <select id="proxy-user-select" required class="w-full border rounded p-2 text-sm">
+            <option value="">載入團員中...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">2. 選擇商品與規格</label>
+          <select id="proxy-product-select" required class="w-full border rounded p-2 text-sm">
+            <option value="">載入前台現有商品中...</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">3. 數量</label>
+          <input type="number" id="proxy-qty" value="1" min="1" required class="w-full border rounded p-2 text-sm">
+        </div>
+
+        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 rounded transition">
+          確認代下單
+        </button>
+      </form>
+    </div>
+
+    <!-- 頁籤 3: 團員名單 -->
     <div id="section-members" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
       <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">已註冊團員名單</h2>
       <div id="member-list-container">
@@ -80,9 +107,9 @@
       </div>
     </div>
 
-    <!-- 頁籤 3: 訂單管理 -->
+    <!-- 頁籤 4: 訂單管理與歷史記錄 (需求 2, 3) -->
     <div id="section-orders" class="hidden bg-white p-6 rounded-b-lg shadow-sm">
-      <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">團員下單紀錄</h2>
+      <h2 class="text-xl font-bold mb-4 text-gray-700 border-b pb-2">📦 訂單總覽與紀錄</h2>
       <div id="order-list-container">
         <p class="text-gray-500 text-sm">載入訂單資料中...</p>
       </div>
@@ -92,38 +119,22 @@
   <script type="module" src="./auth.js"></script>
   <script type="module" src="./products.js"></script>
   <script>
-    // 切換頁籤邏輯
-    const tabAdd = document.getElementById('tab-add-btn');
-    const tabMembers = document.getElementById('tab-members-btn');
-    const tabOrders = document.getElementById('tab-orders-btn');
+    const tabs = [
+      { btn: 'tab-add-btn', sec: 'section-add-product' },
+      { btn: 'tab-proxy-btn', sec: 'section-proxy' },
+      { btn: 'tab-members-btn', sec: 'section-members' },
+      { btn: 'tab-orders-btn', sec: 'section-orders' }
+    ];
 
-    const secAdd = document.getElementById('section-add-product');
-    const secMembers = document.getElementById('section-members');
-    const secOrders = document.getElementById('section-orders');
-
-    function resetTabs() {
-      [tabAdd, tabMembers, tabOrders].forEach(t => {
-        t.className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700";
+    tabs.forEach(t => {
+      document.getElementById(t.btn).addEventListener('click', () => {
+        tabs.forEach(item => {
+          document.getElementById(item.btn).className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700";
+          document.getElementById(item.sec).classList.add('hidden');
+        });
+        document.getElementById(t.btn).className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white";
+        document.getElementById(t.sec).classList.remove('hidden');
       });
-      [secAdd, secMembers, secOrders].forEach(s => s.classList.add('hidden'));
-    }
-
-    tabAdd.addEventListener('click', () => {
-      resetTabs();
-      tabAdd.className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white";
-      secAdd.classList.remove('hidden');
-    });
-
-    tabMembers.addEventListener('click', () => {
-      resetTabs();
-      tabMembers.className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white";
-      secMembers.classList.remove('hidden');
-    });
-
-    tabOrders.addEventListener('click', () => {
-      resetTabs();
-      tabOrders.className = "flex-1 py-3 px-4 font-semibold text-center border-b-2 border-blue-600 text-blue-600 bg-white";
-      secOrders.classList.remove('hidden');
     });
   </script>
 </body>
