@@ -2,28 +2,30 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <!-- 手機適配設定 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>團員首頁 - 代購網站</title>
-  <!-- 載入 Tailwind CSS -->
+  <title>代購賣場 - 商品大廳</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 載入 Google 登入 SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="bg-gray-50 flex flex-col md:flex-row min-h-screen">
 
-  <!-- 1. 電腦端側邊欄 (團員視角：只有購物與訂單) -->
+  <!-- 1. 電腦端側邊欄（完全移除團主後台） -->
   <aside class="hidden md:flex flex-col w-64 bg-white border-r min-h-screen p-4">
-    <h1 class="text-xl font-bold mb-6 text-indigo-600">🛍️ 代購小幫手</h1>
+    <h1 class="text-xl font-bold mb-6 text-indigo-600">🛍️ 代購賣場</h1>
     <nav class="flex flex-col space-y-2">
-      <a href="index.html" class="p-3 rounded-lg bg-indigo-50 text-indigo-600 font-bold">🛒 商品大廳</a>
-      <a href="search.html" class="p-3 rounded-lg text-gray-600 hover:bg-gray-100">🔍 搜尋商品</a>
-      <!-- 團員選單：個人訂單紀錄與轉單入口 -->
-      <a href="#" id="my-orders-btn" class="p-3 rounded-lg text-gray-600 hover:bg-gray-100">📋 我的訂單紀錄</a>
+      <!-- 點擊切換視角 -->
+      <button onclick="switchTab('products')" id="tab-btn-products" class="w-full text-left p-3 rounded-lg bg-indigo-50 text-indigo-600 font-bold">
+        🛒 開團商品大廳
+      </button>
+      <a href="search.html" class="p-3 rounded-lg text-gray-600 hover:bg-gray-100">
+        🔍 搜尋商品
+      </a>
+      <button onclick="switchTab('orders')" id="tab-btn-orders" class="w-full text-left p-3 rounded-lg text-gray-600 hover:bg-gray-100">
+        📋 我的訂單與轉單
+      </button>
     </nav>
 
     <div class="mt-auto pt-4 border-t">
-      <!-- 登入狀態與按鈕 -->
       <div id="user-info-desktop" class="text-sm text-gray-500 mb-2">未登入</div>
       <button id="login-btn-desktop" onclick="handleGoogleLogin()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700">
         Google 登入
@@ -33,7 +35,7 @@
 
   <!-- 2. 手機端頂部欄 -->
   <header class="md:hidden bg-white border-b p-4 flex justify-between items-center">
-    <h1 class="text-lg font-bold text-indigo-600">🛍️ 代購小幫手</h1>
+    <h1 class="text-lg font-bold text-indigo-600">🛍️ 代購賣場</h1>
     <button id="login-btn-mobile" onclick="handleGoogleLogin()" class="bg-indigo-600 text-white px-3 py-1.5 text-sm rounded-lg">
       登入
     </button>
@@ -41,21 +43,74 @@
 
   <!-- 3. 主要內容區域 -->
   <main class="flex-1 p-4 md:p-8 mb-16 md:mb-0">
-    <h2 class="text-2xl font-bold mb-4">最新商品</h2>
-    <!-- 商品展示區 -->
-    <div id="product-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-      <p class="text-gray-400">商品載入中...</p>
-    </div>
+    
+    <!-- 分頁 A：預設顯示的「商品大廳」 -->
+    <section id="view-products">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">🔥 現正熱賣 / 預購商品</h2>
+        <span class="text-sm text-gray-500">點擊商品即可下單</span>
+      </div>
+
+      <!-- 商品卡片展示區 -->
+      <div id="product-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        <p class="text-gray-400">商品載入中...</p>
+      </div>
+    </section>
+
+    <!-- 分頁 B：「我的訂單與轉單區」（預設隱藏，點擊才打開） -->
+    <section id="view-orders" class="hidden">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">📋 我的訂單紀錄與轉單</h2>
+      
+      <!-- 未登入提示 -->
+      <div id="order-login-notice" class="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6">
+        🔒 請先進行 Google 登入，才能查看個人的下單總紀錄與進行轉單操作。
+      </div>
+
+      <!-- 訂單列表 (登入後顯示) -->
+      <div id="my-orders-list" class="space-y-4">
+        <p class="text-gray-400">登入後將載入您的歷史訂單...</p>
+      </div>
+    </section>
+
   </main>
 
-  <!-- 4. 手機端底部捷徑欄 (團員視角) -->
-  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 text-xs text-center">
-    <a href="index.html" class="flex-1 py-1 text-indigo-600 font-bold">🛒<br>首頁</a>
-    <a href="search.html" class="flex-1 py-1 text-gray-600">🔍<br>搜尋</a>
-    <a href="#" class="flex-1 py-1 text-gray-600">📋<br>我的訂單</a>
+  <!-- 4. 手機端底部捷徑欄（完全移除團主後台） -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 text-xs text-center z-10">
+    <button onclick="switchTab('products')" class="flex-1 py-1 text-indigo-600 font-bold">
+      🛒<br>商品大廳
+    </button>
+    <a href="search.html" class="flex-1 py-1 text-gray-600">
+      🔍<br>搜尋
+    </a>
+    <button onclick="switchTab('orders')" class="flex-1 py-1 text-gray-600">
+      📋<br>我的訂單
+    </button>
   </nav>
 
-  <!-- 引入邏輯檔 -->
+  <!-- 切換頁籤的分頁腳本 -->
+  <script>
+    function switchTab(tabName) {
+      const productsView = document.getElementById('view-products');
+      const ordersView = document.getElementById('view-orders');
+      const btnProducts = document.getElementById('tab-btn-products');
+      const btnOrders = document.getElementById('tab-btn-orders');
+
+      if (tabName === 'products') {
+        productsView.classList.remove('hidden');
+        ordersView.classList.add('hidden');
+        
+        btnProducts.className = "w-full text-left p-3 rounded-lg bg-indigo-50 text-indigo-600 font-bold";
+        btnOrders.className = "w-full text-left p-3 rounded-lg text-gray-600 hover:bg-gray-100";
+      } else if (tabName === 'orders') {
+        productsView.classList.add('hidden');
+        ordersView.classList.remove('hidden');
+
+        btnOrders.className = "w-full text-left p-3 rounded-lg bg-indigo-50 text-indigo-600 font-bold";
+        btnProducts.className = "w-full text-left p-3 rounded-lg text-gray-600 hover:bg-gray-100";
+      }
+    }
+  </script>
+
   <script src="products.js"></script>
 </body>
 </html>
