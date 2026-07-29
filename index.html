@@ -14,7 +14,6 @@
       <h1 class="text-xl font-bold text-blue-600">🛒 團購賣場</h1>
       
       <div class="flex items-center gap-3">
-        <!-- 頂部購物車快捷按鈕 -->
         <button onclick="openCartModal()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow flex items-center gap-1">
           🛒 購物車 (<span id="cart-nav-count">0</span>)
         </button>
@@ -29,10 +28,7 @@
   <main class="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
     <div class="flex justify-between items-center border-b pb-4">
       <h2 class="text-2xl font-bold text-gray-800">進行中的團購</h2>
-      <!-- 後台入口預設隱藏，只有團主登入才會顯示 -->
-      <a id="admin-link" href="admin.html" class="hidden text-xs bg-slate-800 hover:bg-slate-900 text-white font-bold px-3 py-1.5 rounded-lg transition shadow">
-        ⚙️ 進入團主後台
-      </a>
+      <a href="admin.html" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded">團主後台</a>
     </div>
 
     <!-- 商品開團分類區 -->
@@ -40,11 +36,17 @@
       <p class="text-gray-500">商品載入中...</p>
     </div>
 
-    <!-- 個人歷史訂單區 -->
+    <!-- 個人歷史訂單區 & 轉單專區 (需求 2) -->
     <div class="mt-12 pt-8 border-t border-gray-200">
-      <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-        📜 我的下單紀錄
-      </h3>
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+          📜 我的下單紀錄
+        </h3>
+        <button onclick="receiveTransferPrompt()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition flex items-center gap-1">
+          📥 輸入驗證碼接收轉單
+        </button>
+      </div>
+
       <div id="my-orders-container" class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
         <p class="text-gray-400 text-sm">請先登入以檢視您的訂單紀錄。</p>
       </div>
@@ -95,17 +97,14 @@
 
   <script type="module">
     import { db, auth } from "./auth.js";
-    import { collection, onSnapshot, query, orderBy, where, addDoc, serverTimestamp, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { collection, onSnapshot, query, orderBy, where, addDoc, serverTimestamp, doc, getDoc, updateDoc, arrayUnion, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-    const ADMIN_EMAIL = "chuchu20011225@gmail.com";
     const container = document.getElementById('products-container');
     const myOrdersContainer = document.getElementById('my-orders-container');
-    const adminLink = document.getElementById('admin-link');
     const modal = document.getElementById('image-modal');
     const modalImg = document.getElementById('modal-img');
 
-    // 購物車資料庫
     let cart = JSON.parse(localStorage.getItem('user_cart') || '[]');
 
     function saveCart() {
@@ -172,7 +171,7 @@
       if(totalEl) totalEl.innerText = `NT$ ${totalPrice}`;
     }
 
-    // 送出購物車
+    // 購物車結帳
     window.checkoutCart = async () => {
       const user = auth.currentUser;
       if (!user) {
@@ -223,13 +222,92 @@
       }
     };
 
+    // 2. 轉單發起功能 (產生 6 位數驗證碼) (需求 2)
+    window.startOrderTransfer = async (orderId, productName, optionName) => {
+      const user = auth.currentUser;
+      if (!user) return alert("請先登入！");
+
+      if (!confirm(`確定要將【${productName} - ${optionName}】轉單出去嗎？\n系統將會產生一組 6 位數驗證碼給您。`)) return;
+
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      let currentNickname = user.displayName || "團員";
+      try {
+        const uSnap = await getDoc(doc(db, "users", user.uid));
+        if (uSnap.exists() && uSnap.data()?.nickname) currentNickname = uSnap.data().nickname;
+      } catch(e) {}
+
+      try {
+        await updateDoc(doc(db, "orders", orderId), {
+          status: "轉單中",
+          transferCode: code,
+          historyLogs: arrayUnion({
+            action: `團員發起轉單 (驗證碼: ${code})`,
+            operator: `${currentNickname} (${user.email})`,
+            timestamp: new Date().toLocaleString()
+          })
+        });
+
+        alert(`🔑 轉單驗證碼已生成：【 ${code} 】\n\n請將此 6 位數驗證碼提供給接收對象，對方輸入驗證碼後即可接管該訂單！`);
+      } catch (e) {
+        alert("發起轉單失敗：" + e.message);
+      }
+    };
+
+    // 3. 接收轉單功能 (驗證碼校對) (需求 2)
+    window.receiveTransferPrompt = async () => {
+      const user = auth.currentUser;
+      if (!user) return alert("請先登入後再接收轉單！");
+
+      const inputCode = prompt("請輸入對方給您的 6 位數轉單驗證碼：");
+      if (!inputCode || !inputCode.trim()) return;
+
+      const code = inputCode.trim();
+
+      try {
+        const q = query(collection(db, "orders"), where("transferCode", "==", code), where("status", "==", "轉單中"));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          alert("❌ 找不到對應的轉單驗證碼，或該訂單已被接收/取消！");
+          return;
+        }
+
+        let currentNickname = user.displayName || "團員";
+        try {
+          const uSnap = await getDoc(doc(db, "users", user.uid));
+          if (uSnap.exists() && uSnap.data()?.nickname) currentNickname = uSnap.data().nickname;
+        } catch(e) {}
+
+        const targetDoc = snapshot.docs[0];
+        const oldOrder = targetDoc.data();
+
+        await updateDoc(doc(db, "orders", targetDoc.id), {
+          userId: user.uid,
+          userName: currentNickname,
+          userEmail: user.email,
+          status: "已下單",
+          transferCode: null, // 清除驗證碼
+          historyLogs: arrayUnion({
+            action: `轉單接收成功：由 [${oldOrder.userName || '原買家'}] 轉交給 [${currentNickname}]`,
+            operator: `${currentNickname} (${user.email})`,
+            timestamp: new Date().toLocaleString()
+          })
+        });
+
+        alert(`🎉 轉單成功！【${oldOrder.productName} - ${oldOrder.optionName}】已順利移交至您的帳戶！`);
+      } catch (e) {
+        alert("接收轉單失敗：" + e.message);
+      }
+    };
+
     document.getElementById('close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
     window.openImageModal = (src) => {
       modalImg.src = src;
       modal.classList.remove('hidden');
     };
 
-    // 商品與分類
+    // 商品列表渲染
     onSnapshot(query(collection(db, "products"), orderBy("createdAt", "desc")), (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
@@ -297,16 +375,9 @@
       });
     });
 
+    // 團員個人歷史訂單列表
     onAuthStateChanged(auth, (user) => {
       renderCart();
-
-      // 檢查是否為團主，控制後台按鈕顯示
-      if (user && user.email === ADMIN_EMAIL) {
-        if (adminLink) adminLink.classList.remove('hidden');
-      } else {
-        if (adminLink) adminLink.classList.add('hidden');
-      }
-
       if (!user) {
         myOrdersContainer.innerHTML = "<p class='text-gray-400 text-sm'>請先登入以檢視您的訂單紀錄。</p>";
         return;
@@ -319,18 +390,32 @@
         }
 
         let html = `<div class="space-y-3">`;
-        snapshot.forEach(doc => {
-          const ord = doc.data();
+        snapshot.forEach(docSnap => {
+          const ord = docSnap.data();
+          const ordId = docSnap.id;
+          const isTransferring = ord.status === "轉單中";
+
           html += `
-            <div class="p-3 border rounded-lg flex justify-between items-center bg-gray-50 text-sm">
+            <div class="p-3.5 border rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50 text-sm gap-2">
               <div>
-                <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded mr-2">${ord.storeTitle || '團購'}</span>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded">${ord.storeTitle || '團購'}</span>
+                  ${isTransferring ? `<span class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">🔑 轉單驗證碼：${ord.transferCode}</span>` : ''}
+                </div>
                 <span class="font-bold text-gray-800">${ord.productName}</span>
                 <span class="text-gray-600"> (${ord.optionName}) x${ord.qty || 1}</span>
               </div>
-              <div class="text-right">
-                <div class="font-bold text-blue-600">NT$ ${(ord.price || 0) * (ord.qty || 1)}</div>
-                <div class="text-xs text-gray-400">${ord.status || '處理中'}</div>
+              
+              <div class="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4">
+                <div class="text-right">
+                  <div class="font-bold text-blue-600">NT$ ${(ord.price || 0) * (ord.qty || 1)}</div>
+                  <div class="text-xs text-gray-400">${ord.status || '已下單'}</div>
+                </div>
+                
+                <button onclick="startOrderTransfer('${ordId}', '${ord.productName}', '${ord.optionName}')" 
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2.5 py-1.5 rounded-lg font-medium transition">
+                  🔄 轉單
+                </button>
               </div>
             </div>
           `;
