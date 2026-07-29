@@ -6,7 +6,7 @@
   <title>團購賣場</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800">
+<body class="bg-gray-50 min-h-screen text-gray-800 pb-12">
 
   <!-- 頁首 -->
   <nav class="bg-white border-b shadow-sm p-4 sticky top-0 z-10">
@@ -19,66 +19,192 @@
   </nav>
 
   <!-- 主內容區 -->
-  <main class="max-w-4xl mx-auto p-4 sm:p-6">
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-800">進行中的團購商品</h2>
+  <main class="max-w-4xl mx-auto p-4 sm:p-6 space-y-8">
+    <div class="flex justify-between items-center border-b pb-4">
+      <h2 class="text-2xl font-bold text-gray-800">進行中的團購</h2>
       <a href="admin.html" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded">團主後台</a>
     </div>
 
-    <!-- 商品列表區 -->
-    <div id="products-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- 商品依團購分類區 -->
+    <div id="products-container" class="space-y-8">
       <p class="text-gray-500">商品載入中...</p>
+    </div>
+
+    <!-- 團員個人歷史訂單區 -->
+    <div class="mt-12 pt-8 border-t border-gray-200">
+      <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        📜 我的下單紀錄
+      </h3>
+      <div id="my-orders-container" class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p class="text-gray-400 text-sm">請先登入以檢視您的訂單紀錄。</p>
+      </div>
     </div>
   </main>
 
-  <!-- Firebase 邏輯 -->
+  <!-- 圖片大圖 Modal (需求 2) -->
+  <div id="image-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="relative max-w-4xl w-full flex justify-center items-center">
+      <button id="close-modal-btn" class="absolute -top-10 right-0 text-white text-3xl font-bold hover:text-gray-300">&times;</button>
+      <img id="modal-img" src="" class="max-h-[85vh] max-w-full object-contain rounded-lg shadow-2xl">
+    </div>
+  </div>
+
+  <!-- JS 邏輯 -->
   <script type="module">
-    import { db } from "./auth.js";
-    import { collection, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { db, auth } from "./auth.js";
+    import { collection, onSnapshot, query, orderBy, where, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const container = document.getElementById('products-container');
+    const myOrdersContainer = document.getElementById('my-orders-container');
+    const modal = document.getElementById('image-modal');
+    const modalImg = document.getElementById('modal-img');
+    const closeModalBtn = document.getElementById('close-modal-btn');
 
-    // 即時讀取 Firestore 商品並渲染
-    const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
-    onSnapshot(q, (snapshot) => {
+    // 關閉大圖
+    closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', (e) => { if(e.target === modal) modal.classList.add('hidden'); });
+
+    // 開啟大圖函式
+    window.openImageModal = (src) => {
+      modalImg.src = src;
+      modal.classList.remove('hidden');
+    };
+
+    // 1. 即時讀取商品並按「團名」分類 (需求 1)
+    const qProducts = query(collection(db, "products"), orderBy("createdAt", "desc"));
+    onSnapshot(qProducts, (snapshot) => {
       container.innerHTML = "";
       if (snapshot.empty) {
         container.innerHTML = "<p class='text-gray-500'>目前沒有進行中的團購商品。</p>";
         return;
       }
 
+      // 按 storeTitle (團名稱) 分組
+      const groups = {};
       snapshot.forEach((doc) => {
-        const item = doc.data();
-        const card = document.createElement('div');
-        card.className = "bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 flex flex-col";
-        
-        const optionsHtml = (item.options || []).map(opt => `
-          <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-sm">
-            <span class="font-medium text-gray-700">${opt.name}</span>
-            <div class="flex items-center gap-2">
-              <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
-              <button class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded">下單</button>
-            </div>
-          </div>
-        `).join('');
-
-        card.innerHTML = `
-          <img src="${item.imageUrl}" class="w-full h-48 object-cover bg-gray-100" alt="${item.productName}">
-          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-            <div>
-              <span class="text-xs font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full">${item.storeTitle}</span>
-              <h3 class="text-lg font-bold text-gray-900 mt-2">${item.productName}</h3>
-            </div>
-            <div class="space-y-2">
-              ${optionsHtml}
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
+        const item = { id: doc.id, ...doc.data() };
+        const title = item.storeTitle || "未分類團購";
+        if (!groups[title]) groups[title] = [];
+        groups[title].push(item);
       });
-    }, (err) => {
-      console.error("同步失敗：", err);
-      container.innerHTML = `<p class='text-red-500'>無法載入商品 (${err.message})，請檢查權限設定。</p>`;
+
+      // 渲染分組
+      Object.keys(groups).forEach(storeTitle => {
+        const groupSection = document.createElement('div');
+        groupSection.className = "bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4";
+
+        let productsHtml = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
+
+        groups[storeTitle].forEach(item => {
+          const optionsHtml = (item.options || []).map(opt => `
+            <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-lg border text-sm">
+              <span class="font-medium text-gray-700">${opt.name}</span>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-blue-600">NT$ ${opt.price}</span>
+                <button onclick="placeOrder('${item.productName}', '${opt.name}', ${opt.price}, '${storeTitle}')" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg shadow-sm font-medium">
+                  下單
+                </button>
+              </div>
+            </div>
+          `).join('');
+
+          productsHtml += `
+            <div class="border rounded-xl p-4 flex flex-col justify-between space-y-3 bg-white hover:shadow-md transition">
+              <div>
+                <div class="relative group cursor-pointer overflow-hidden rounded-lg mb-3" onclick="openImageModal('${item.imageUrl}')">
+                  <img src="${item.imageUrl}" class="w-full h-44 object-cover group-hover:scale-105 transition duration-200" alt="${item.productName}">
+                  <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition">
+                    🔍 點擊查看大圖
+                  </div>
+                </div>
+                <h4 class="font-bold text-gray-900 text-base">${item.productName}</h4>
+              </div>
+              <div class="space-y-2">
+                ${optionsHtml}
+              </div>
+            </div>
+          `;
+        });
+
+        productsHtml += `</div>`;
+
+        groupSection.innerHTML = `
+          <div class="flex items-center gap-2 border-b pb-3">
+            <span class="text-lg">📢</span>
+            <h3 class="text-xl font-bold text-blue-900">${storeTitle}</h3>
+          </div>
+          ${productsHtml}
+        `;
+
+        container.appendChild(groupSection);
+      });
+    });
+
+    // 2. 下單邏輯 (需求 3)
+    window.placeOrder = async (productName, optionName, price, storeTitle) => {
+      const user = auth.currentUser;
+      if (!user) {
+        alert("請先完成 Google 登入才能下單！");
+        return;
+      }
+
+      if (confirm(`確定要下單【${storeTitle}】\n${productName} - ${optionName} (NT$ ${price}) 嗎？`)) {
+        try {
+          await addDoc(collection(db, "orders"), {
+            userId: user.uid,
+            userName: user.displayName || "團員",
+            userEmail: user.email,
+            storeTitle: storeTitle,
+            productName: productName,
+            optionName: optionName,
+            price: price,
+            status: "已下單",
+            createdAt: serverTimestamp()
+          });
+          alert("🎉 下單成功！後台與您的個人訂單已同步更新。");
+        } catch (e) {
+          console.error("下單失敗", e);
+          alert("下單失敗：" + e.message);
+        }
+      }
+    };
+
+    // 3. 即時監聽登入狀態並加載團員個人訂單 (需求 3)
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        myOrdersContainer.innerHTML = "<p class='text-gray-400 text-sm'>請先登入以檢視您的訂單紀錄。</p>";
+        return;
+      }
+
+      const qMyOrders = query(collection(db, "orders"), where("userId", "==", user.uid));
+      onSnapshot(qMyOrders, (snapshot) => {
+        if (snapshot.empty) {
+          myOrdersContainer.innerHTML = "<p class='text-gray-500 text-sm'>您目前尚無下單紀錄。</p>";
+          return;
+        }
+
+        let html = `<div class="space-y-3">`;
+        snapshot.forEach(doc => {
+          const ord = doc.data();
+          html += `
+            <div class="p-3 border rounded-lg flex justify-between items-center bg-gray-50 text-sm">
+              <div>
+                <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded mr-2">${ord.storeTitle || '團購'}</span>
+                <span class="font-bold text-gray-800">${ord.productName}</span>
+                <span class="text-gray-600"> (${ord.optionName})</span>
+              </div>
+              <div class="text-right">
+                <div class="font-bold text-blue-600">NT$ ${ord.price}</div>
+                <div class="text-xs text-gray-400">${ord.status || '處理中'}</div>
+              </div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+        myOrdersContainer.innerHTML = html;
+      });
     });
   </script>
 </body>

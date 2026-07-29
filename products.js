@@ -1,5 +1,5 @@
 import { db, auth } from "./auth.js";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const ADMIN_EMAIL = "chuchu20011225@gmail.com";
 
@@ -54,7 +54,7 @@ if (form) {
         createdBy: currentUser.email
       });
 
-      alert("🎉 商品上架成功！前台頁面將會同步更新。");
+      alert("🎉 商品上架成功！已在對應團購中發布。");
       form.reset();
     } catch (error) {
       console.error("上架失敗：", error);
@@ -66,7 +66,7 @@ if (form) {
   });
 }
 
-// 2. 即時載入團員名單 (Firestore 'users' 集合)
+// 2. 團員名單管理與暱稱修改 (需求 4)
 const memberListContainer = document.getElementById('member-list-container');
 if (memberListContainer) {
   onSnapshot(collection(db, "users"), (snapshot) => {
@@ -75,15 +75,19 @@ if (memberListContainer) {
       return;
     }
     let html = `<div class='divide-y border rounded-lg overflow-hidden bg-white shadow-sm'>`;
-    snapshot.forEach((doc) => {
-      const user = doc.data();
+    snapshot.forEach((docSnap) => {
+      const user = docSnap.data();
+      const userId = docSnap.id;
       html += `
         <div class='p-3 flex justify-between items-center hover:bg-gray-50'>
           <div>
-            <div class='font-bold text-gray-800'>${user.nickname || '未設定暱稱'}</div>
+            <div class='font-bold text-gray-800 flex items-center gap-2'>
+              ${user.nickname || '未設定暱稱'}
+              <button onclick="editNickname('${userId}', '${user.nickname || ''}')" class='text-xs text-blue-600 hover:underline'>✏️ 改暱稱</button>
+            </div>
             <div class='text-xs text-gray-500'>${user.email || '無 Email'}</div>
           </div>
-          <span class='text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-mono'>UID: ${doc.id.substring(0,6)}...</span>
+          <span class='text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-mono'>UID: ${userId.substring(0,6)}...</span>
         </div>
       `;
     });
@@ -95,7 +99,23 @@ if (memberListContainer) {
   });
 }
 
-// 3. 即時載入訂單 (Firestore 'orders' 集合)
+// 團主修改團員暱稱全域函式 (需求 4)
+window.editNickname = async (userId, oldNickname) => {
+  const newNickname = prompt("請輸入該團員的新暱稱：", oldNickname);
+  if (newNickname !== null && newNickname.trim() !== "") {
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        nickname: newNickname.trim()
+      });
+      alert("✅ 暱稱修改成功！");
+    } catch (e) {
+      console.error("修改失敗", e);
+      alert("修改失敗：" + e.message);
+    }
+  }
+};
+
+// 3. 即時訂單管理連動 (需求 3)
 const orderListContainer = document.getElementById('order-list-container');
 if (orderListContainer) {
   const qOrders = query(collection(db, "orders"), orderBy("createdAt", "desc"));
@@ -110,13 +130,16 @@ if (orderListContainer) {
       html += `
         <div class='p-4 border rounded-lg bg-white shadow-sm'>
           <div class='flex justify-between items-center mb-2 border-b pb-2'>
-            <span class='font-bold text-blue-600'>${order.userName || '買家'} (${order.userEmail})</span>
-            <span class='text-xs text-gray-400'>${order.status || '處理中'}</span>
+            <span class='font-bold text-blue-600'>👤 ${order.userName || '買家'} (${order.userEmail})</span>
+            <span class='text-xs bg-green-100 text-green-800 font-semibold px-2 py-0.5 rounded'>${order.status || '已下單'}</span>
+          </div>
+          <div class='text-xs font-semibold text-blue-800 bg-blue-50 inline-block px-2 py-1 rounded mb-1'>
+            📢 ${order.storeTitle || '未分組團購'}
           </div>
           <div class='text-sm text-gray-700'>
-            <strong>品名：</strong>${order.productName || ''} - ${order.optionName || ''}
+            <strong>商品：</strong>${order.productName || ''} - <span class="text-blue-600 font-medium">${order.optionName || ''}</span>
           </div>
-          <div class='text-sm text-gray-700'>
+          <div class='text-sm text-gray-700 mt-1'>
             <strong>金額：</strong>NT$ ${order.price || 0}
           </div>
         </div>
